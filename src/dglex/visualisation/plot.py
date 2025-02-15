@@ -1,20 +1,34 @@
 import dgl
 import matplotlib
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import networkx as nx
 import seaborn as sns
+from dataclasses import dataclass
+
+# Type aliases
+Color = Union[str, Tuple[float]]
+Legend = plt.Line2D
+
+
+@dataclass
+class EdgeTypeInfo:
+    etype: str
+    eid: int
+    ueid: int
+    etype_legend_name: str
 
 
 def _plot(
     nx_g: nx.Graph,
     title: str = "",
     node_labels: Dict[int, str] = None,
+    node_colors: List[Color] = None,
+    node_legend: List[Legend] = None,
     edge_labels: Dict[int, str] = None,
-    node_colors: List[str] = None,
-    node_legend: List[plt.Line2D] = None,
+    edge_colors: List[Color] = None,
+    edge_legend: List[Legend] = None,
     figsize: Tuple[int, int] = (10, 10),
-    *args,
     **kwargs,
 ) -> matplotlib.axes.Axes:
     fig, ax = plt.subplots(figsize=figsize)
@@ -26,12 +40,12 @@ def _plot(
         ax=ax,
         labels=node_labels,
         node_color=node_colors,
+        edge_color=edge_colors,
         # edge_labels=edge_labels,
-        *args,
         **kwargs,
     )
 
-    plt.legend(handles=node_legend, loc="best")
+    plt.legend(handles=node_legend + edge_legend, loc="best")
     ax.set_title(title)
 
     return ax
@@ -58,16 +72,18 @@ def _get_heterogenous_node_labels(
     return node_labels
 
 
-def _get_ntype_colors(n: int, ntype_colors: List[str]) -> List[str]:
-    if ntype_colors is None:
-        ntype_colors = sns.color_palette("tab10", n)
-    return ntype_colors
+def _get_colors(
+    n: int, colors: List[Color], palette_name: str = "tab10"
+) -> List[Color]:
+    if colors is None:
+        colors = sns.color_palette(palette=palette_name, n_colors=n)
+    return colors
 
 
 def _get_homogeneous_node_colors_and_legend(
-    ntype_colors: List[str],
-) -> Tuple[List[str], List[plt.Line2D]]:
-    node_colors = ntype_colors[0]
+    ntype_colors: List[Color],
+) -> Tuple[List[Color], List[Legend]]:
+    node_colors = ntype_colors
     node_legend = [
         plt.Line2D(
             [0],
@@ -83,8 +99,8 @@ def _get_homogeneous_node_colors_and_legend(
 
 
 def _get_heterogenous_node_colors_and_legend(
-    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: List[str]
-) -> Tuple[List[str], List[plt.Line2D]]:
+    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: List[Color]
+) -> Tuple[List[Color], List[Legend]]:
     node_colors = [
         ntype_colors[ndata[1][dgl.NTYPE].item()] for ndata in ng.nodes(data=True)
     ]
@@ -103,14 +119,165 @@ def _get_heterogenous_node_colors_and_legend(
     return node_colors, node_legend
 
 
-def _plot_graph(
+def _get_homogeneous_edge_colors_and_legend(
+    etype_colors: List[Color],
+) -> Tuple[List[Color], List[Legend]]:
+    edge_colors = etype_colors
+    edge_legend = [
+        plt.Line2D(
+            [0],
+            [0],
+            lw=2,
+            color=etype_colors[0],
+            markerfacecolor=etype_colors[0],
+            markersize=10,
+            label="Edge",
+        )
+    ]
+    return edge_colors, edge_legend
+
+
+def _get_heterogeneous_edge_colors_and_legend(
+    hetero_graph: dgl.DGLHeteroGraph,
+    ng: nx.Graph,
+    etype_colors: List[Color],
+) -> Tuple[List[Color], List[Legend]]:
+
+    edge_colors = [
+        etype_colors[edata[2][dgl.ETYPE].item()] for edata in ng.edges(data=True)
+    ]
+
+    edge_legend = [
+        plt.Line2D(
+            [0],
+            [0],
+            lw=2,
+            color=etype_colors[i],
+            markerfacecolor=etype_colors[i],
+            markersize=10,
+            label=etype,
+        )
+        for i, etype in enumerate(hetero_graph.etypes)
+    ]
+
+    return edge_colors, edge_legend
+
+
+def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
+    hetero_graph: dgl.DGLHeteroGraph,
+    ng: nx.Graph,
+    etype_colors: List[Color],
+    reverse_etypes: Dict[str, str],
+) -> Tuple[List[Color], List[Legend]]:
+    edge_colors = []
+    # reverse_etypes_tuples = _get_revese_etypes_tuple(reverse_etypes)
+    ueid_master = _create_ueid_master(hetero_graph, reverse_etypes)
+
+    edge_colors = [
+        etype_colors[ueid_master[edata[2][dgl.ETYPE].item()].ueid]
+        for edata in ng.edges(data=True)
+    ]
+
+    edge_legend = []
+    processed_ueid = []
+    for i, etype in enumerate(hetero_graph.etypes):
+        if ueid_master[i].ueid in processed_ueid:
+            continue
+
+        edge_legend.append(
+            plt.Line2D(
+                [0],
+                [0],
+                lw=2,
+                color=etype_colors[ueid_master[i].ueid],
+                markerfacecolor=etype_colors[ueid_master[i].ueid],
+                markersize=10,
+                label=ueid_master[i].etype_legend_name,
+            )
+        )
+        processed_ueid.append(ueid_master[i].ueid)
+
+    return edge_colors, edge_legend
+
+
+def _count_heterogeneous_edges(
+    graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
+) -> int:
+
+    num_directed_edge = len(
+        [etype for etype in graph.etypes if etype not in reverse_etypes]
+    )
+    num_undirected_edge = len(reverse_etypes) // 2
+
+    return num_directed_edge + num_undirected_edge
+
+
+def _create_ueid_master(
+    hetero_graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
+) -> Dict[int, EdgeTypeInfo]:
+    """
+    Define the same ID for an edge and its reversed edge as Unique Edge ID (ueid).
+    """
+
+    ueid_master = {}
+
+    # create etype_eid_master
+    # example: {'click': 0, 'clicked-by': 1, 'follow': 2, 'followed-by': 3}
+    etype_eid_master = {etype: i for i, etype in enumerate(hetero_graph.etypes)}
+
+    # Create reverse etype tuples
+    # example: {'click': 'cilked-by', 'clicked-by':'click', 'follow': 'followed-by', 'followed-by': 'follow'}
+    # => [('click', 'clicked-by'), ('follow', 'followed-by')]
+    reverse_etype_tuples = []
+    for k, v in reverse_etypes.items():
+        if (v, k) not in reverse_etype_tuples:
+            reverse_etype_tuples.append((k, v))
+
+    # Create ueid_master
+    # Here an edge and its reversed edge have the same ID
+    # example: {0: EdgeTypeInfo('click', 0, 0, 'click-clikecd-by'),
+    #           1: EdgeTypeInfo('clicked-by', 1, 0, 'click-clikecd-by')}
+    #           2: EdgeTypeInfo('follow', 2, 1, 'follow-followed-by'),
+    #           3: EdgeTypeInfo('followed-by', 3, 1, 'follow-followed-by')}
+    for i, etype_tuple in enumerate(reverse_etype_tuples):
+        ueid_master[etype_eid_master[etype_tuple[0]]] = EdgeTypeInfo(
+            etype=etype_tuple[0],
+            eid=etype_eid_master[etype_tuple[0]],
+            ueid=i,
+            etype_legend_name=etype_tuple[0] + "/" + etype_tuple[1],
+        )
+        ueid_master[etype_eid_master[etype_tuple[1]]] = EdgeTypeInfo(
+            etype=etype_tuple[1],
+            eid=etype_eid_master[etype_tuple[1]],
+            ueid=i,
+            etype_legend_name=etype_tuple[0] + "/" + etype_tuple[1],
+        )
+
+    # Add the remaining edge types that are directed
+    directed_edges = [
+        etype for etype in hetero_graph.etypes if etype not in reverse_etypes
+    ]
+    for i, _etype in enumerate(directed_edges):
+        _ueid = i + len(reverse_etype_tuples)
+        ueid_master[etype_eid_master[_etype]] = EdgeTypeInfo(
+            etype=_etype,
+            eid=etype_eid_master[_etype],
+            ueid=_ueid,
+            etype_legend_name=_etype,
+        )
+
+    return ueid_master
+
+
+def plot_graph(
     graph: dgl.DGLGraph,
     title: str = "",
     node_labels: Dict[int, str] = None,
     edge_labels: Dict[int, str] = None,
-    ntype_colors: List[str] = None,
+    ntype_colors: List[Color] = None,
+    etype_colors: List[Color] = None,
     figsize: Tuple[int, int] = (6, 4),
-    *args,
+    reverse_etypes: Dict[str, str] = None,
     **kwargs,
 ) -> matplotlib.axes.Axes:
 
@@ -119,8 +286,10 @@ def _plot_graph(
         edge_attrs = [dgl.EID] if dgl.EID in graph.edata else []
         ng = dgl.to_networkx(graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
         node_labels = _get_homogenous_node_labels(graph, ng, node_labels)
-        ntype_colors = _get_ntype_colors(1, ntype_colors)
+        ntype_colors = _get_colors(1, ntype_colors)
+        etype_colors = _get_colors(1, etype_colors)
         node_colors, node_legend = _get_homogeneous_node_colors_and_legend(ntype_colors)
+        edge_colors, edge_legend = _get_homogeneous_edge_colors_and_legend(etype_colors)
 
     else:
         # heterogeneous graph
@@ -129,20 +298,44 @@ def _plot_graph(
         edge_attrs = [dgl.EID, dgl.ETYPE]
         ng = dgl.to_networkx(homo_graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
         node_labels = _get_heterogenous_node_labels(graph, ng, node_labels)
-        ntype_colors = _get_ntype_colors(len(graph.ntypes), ntype_colors)
+        ntype_colors = _get_colors(len(graph.ntypes), ntype_colors)
         node_colors, node_legend = _get_heterogenous_node_colors_and_legend(
             graph, ng, ntype_colors
         )
+
+        if reverse_etypes is None:
+            etype_colors = _get_colors(len(graph.etypes), etype_colors)
+            edge_colors, edge_legend = _get_heterogeneous_edge_colors_and_legend(
+                graph, ng, etype_colors
+            )
+
+        else:
+            for etype in reverse_etypes:
+                assert (
+                    etype in reverse_etypes.values()
+                ), """reverse_etypes must contain all edge types
+                ex) {'click': 'cilked-by', 'clicked-by':'click'}
+                """
+
+            etype_colors = _get_colors(
+                _count_heterogeneous_edges(graph, reverse_etypes), etype_colors
+            )
+            edge_colors, edge_legend = (
+                _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
+                    graph, ng, etype_colors, reverse_etypes
+                )
+            )
 
     return _plot(
         ng,
         title=title,
         node_labels=node_labels,
-        edge_labels=edge_labels,
         node_colors=node_colors,
         node_legend=node_legend,
+        edge_labels=edge_labels,
+        edge_colors=edge_colors,
+        edge_legend=edge_legend,
         figsize=figsize,
-        *args,
         **kwargs,
     )
 
