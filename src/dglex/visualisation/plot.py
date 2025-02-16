@@ -5,6 +5,8 @@ from typing import List, Tuple, Dict, Union
 import networkx as nx
 import seaborn as sns
 from dataclasses import dataclass
+import torch
+from collections import defaultdict
 
 # Type aliases
 Color = Union[str, Tuple[float]]
@@ -25,7 +27,7 @@ def _plot(
     node_labels: Dict[int, str] = None,
     node_colors: List[Color] = None,
     node_legend: List[Legend] = None,
-    edge_labels: Dict[int, str] = None,
+    # edge_labels: Dict[int, str] = None,
     edge_colors: List[Color] = None,
     edge_legend: List[Legend] = None,
     figsize: Tuple[int, int] = (10, 10),
@@ -273,7 +275,7 @@ def plot_graph(
     graph: dgl.DGLGraph,
     title: str = "",
     node_labels: Dict[int, str] = None,
-    edge_labels: Dict[int, str] = None,
+    # edge_labels: Dict[int, str] = None,
     ntype_colors: List[Color] = None,
     etype_colors: List[Color] = None,
     figsize: Tuple[int, int] = (6, 4),
@@ -332,7 +334,7 @@ def plot_graph(
         node_labels=node_labels,
         node_colors=node_colors,
         node_legend=node_legend,
-        edge_labels=edge_labels,
+        # edge_labels=edge_labels,
         edge_colors=edge_colors,
         edge_legend=edge_legend,
         figsize=figsize,
@@ -340,12 +342,86 @@ def plot_graph(
     )
 
 
+def _extract_subgraph_nhop(
+    g: dgl.DGLGraph, target_nodes: List[int], n_hop: int
+) -> dgl.DGLGraph:
+
+    seed_nodes = target_nodes
+    for _i in range(n_hop):
+        if _i == n_hop - 1:
+            sg = dgl.in_subgraph(g, seed_nodes, relabel_nodes=True)
+            break
+        sg = dgl.in_subgraph(g, seed_nodes)
+        src, dst = sg.edges()
+        seed_nodes = torch.cat([src, dst]).unique()
+
+    return sg
+
+
+def _extract_heterogeneous_subgraph_nhop(
+    hetero_graph: dgl.DGLHeteroGraph, target_nodes: Dict[str, List[int]], n_hop: int
+) -> dgl.DGLHeteroGraph:
+    seed_nodes = target_nodes
+    for i in range(n_hop):
+
+        if i == n_hop - 1:
+            sg = dgl.in_subgraph(hetero_graph, seed_nodes, relabel_nodes=True)
+            break
+
+        sg = dgl.in_subgraph(hetero_graph, seed_nodes)
+
+        seed_nodes = defaultdict(list)
+        for src_ntype, etype, dst_ntype in hetero_graph.canonical_etypes:
+            src, dst = sg.edges(etype=etype)
+            seed_nodes[src_ntype].extend(src.tolist())
+            seed_nodes[dst_ntype].extend(dst.tolist())
+            # unique
+            seed_nodes[src_ntype] = list(set(seed_nodes[src_ntype]))
+            seed_nodes[dst_ntype] = list(set(seed_nodes[dst_ntype]))
+
+    return sg
+
+
 def plot_subgraph_with_neighbors(
     graph: dgl.DGLGraph,
-    node_labels: List[int],
-    target_nid: int,
+    target_nodes: Union[List[int], Dict[str, List[int]]],
     n_hop: int,
-    plot_args,
+    fanouts: List[int] = None,
+    title: str = "",
+    node_labels: Dict[int, str] = None,
+    # edge_labels: Dict[int, str] = None,
+    ntype_colors: List[Color] = None,
+    etype_colors: List[Color] = None,
+    figsize: Tuple[int, int] = (6, 4),
+    reverse_etypes: Dict[str, str] = None,
+    **kwargs,
 ) -> matplotlib.axes.Axes:
 
-    pass
+    assert n_hop > 0, "n_hop must be greater than 0"
+
+    if fanouts is None:
+
+        if graph.is_homogeneous:
+            assert (
+                type(target_nodes) == list
+            ), "target_nodes must be a list for homogeneous graph"
+            sg = _extract_subgraph_nhop(graph, target_nodes, n_hop)
+        else:
+            assert (
+                type(target_nodes) == dict
+            ), "target_nodes must be a dictionary for heterogeneous graph"
+            sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
+
+    else:
+        pass
+
+    return plot_graph(
+        sg,
+        title,
+        node_labels,
+        ntype_colors,
+        etype_colors,
+        figsize,
+        reverse_etypes,
+        **kwargs,
+    )
