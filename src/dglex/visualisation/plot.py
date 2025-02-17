@@ -1,15 +1,16 @@
 import dgl
+import torch
 import matplotlib
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict, Union
 import networkx as nx
 import seaborn as sns
-from dataclasses import dataclass
-import torch
+
+from typing import Union
 from collections import defaultdict
+from dataclasses import dataclass
 
 # Type aliases
-Color = Union[str, Tuple[float]]
+Color = Union[str, tuple[float]]
 Legend = plt.Line2D
 
 
@@ -24,13 +25,13 @@ class EdgeTypeInfo:
 def _plot(
     nx_g: nx.Graph,
     title: str = "",
-    node_labels: Dict[int, str] = None,
-    node_colors: List[Color] = None,
-    node_legend: List[Legend] = None,
+    node_labels: Union[dict[int, str], None] = None,
+    node_colors: Union[list[Color], None] = None,
+    node_legend: Union[list[Legend], None] = None,
     # edge_labels: Dict[int, str] = None,
-    edge_colors: List[Color] = None,
-    edge_legend: List[Legend] = None,
-    figsize: Tuple[int, int] = (10, 10),
+    edge_colors: Union[list[Color], None] = None,
+    edge_legend: Union[list[Legend], None] = None,
+    figsize: tuple[int, int] = (10, 10),
     **kwargs,
 ) -> matplotlib.axes.Axes:
     fig, ax = plt.subplots(figsize=figsize)
@@ -54,8 +55,8 @@ def _plot(
 
 
 def _get_homogenous_node_labels(
-    graph: dgl.DGLGraph, ng: nx.Graph, node_labels: Dict[int, str]
-) -> Dict[int, str]:
+    graph: dgl.DGLGraph, ng: nx.Graph, node_labels: Union[dict[int, str], None]
+) -> dict[int, str]:
     if node_labels is None:
         node_labels = {k: str(k) for k in ng.nodes()}
     assert len(node_labels) == graph.number_of_nodes(), "Not enough node labels"
@@ -63,28 +64,40 @@ def _get_homogenous_node_labels(
 
 
 def _get_heterogenous_node_labels(
-    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, node_labels: Dict[int, str]
-) -> Dict[int, str]:
+    hetero_graph: dgl.DGLHeteroGraph,
+    ng: nx.Graph,
+    node_labels: Union[dict[str, dict[int, str]], None],
+) -> dict[int, str]:
+    ntypes = hetero_graph.ntypes
     if node_labels is None:
         node_labels = {
-            ndata[0]: f"{ndata[1][dgl.NTYPE].item()}_{ndata[1][dgl.NID].item()}"
+            ndata[0]: f"{ntypes[ndata[1][dgl.NTYPE].item()]}_{ndata[1][dgl.NID].item()}"
             for ndata in ng.nodes(data=True)
         }
+
+    else:
+        _node_labels = {
+            ndata[0]: node_labels[ntypes[ndata[1][dgl.NTYPE].item()]][
+                ndata[1][dgl.NID].item()
+            ]
+            for ndata in ng.nodes(data=True)
+        }
+        node_labels = _node_labels
     assert len(node_labels) == hetero_graph.number_of_nodes(), "Not enough node labels"
     return node_labels
 
 
 def _get_colors(
-    n: int, colors: List[Color], palette_name: str = "tab10"
-) -> List[Color]:
+    n: int, colors: list[Color], palette_name: str = "tab10"
+) -> list[Color]:
     if colors is None:
         colors = sns.color_palette(palette=palette_name, n_colors=n)
     return colors
 
 
 def _get_homogeneous_node_colors_and_legend(
-    ntype_colors: List[Color],
-) -> Tuple[List[Color], List[Legend]]:
+    ntype_colors: list[Color],
+) -> tuple[list[Color], list[Legend]]:
     node_colors = ntype_colors
     node_legend = [
         plt.Line2D(
@@ -101,8 +114,8 @@ def _get_homogeneous_node_colors_and_legend(
 
 
 def _get_heterogenous_node_colors_and_legend(
-    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: List[Color]
-) -> Tuple[List[Color], List[Legend]]:
+    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: list[Color]
+) -> tuple[list[Color], list[Legend]]:
     node_colors = [
         ntype_colors[ndata[1][dgl.NTYPE].item()] for ndata in ng.nodes(data=True)
     ]
@@ -122,8 +135,8 @@ def _get_heterogenous_node_colors_and_legend(
 
 
 def _get_homogeneous_edge_colors_and_legend(
-    etype_colors: List[Color],
-) -> Tuple[List[Color], List[Legend]]:
+    etype_colors: list[Color],
+) -> tuple[list[Color], list[Legend]]:
     edge_colors = etype_colors
     edge_legend = [
         plt.Line2D(
@@ -142,8 +155,8 @@ def _get_homogeneous_edge_colors_and_legend(
 def _get_heterogeneous_edge_colors_and_legend(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    etype_colors: List[Color],
-) -> Tuple[List[Color], List[Legend]]:
+    etype_colors: list[Color],
+) -> tuple[list[Color], list[Legend]]:
 
     edge_colors = [
         etype_colors[edata[2][dgl.ETYPE].item()] for edata in ng.edges(data=True)
@@ -168,9 +181,9 @@ def _get_heterogeneous_edge_colors_and_legend(
 def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    etype_colors: List[Color],
-    reverse_etypes: Dict[str, str],
-) -> Tuple[List[Color], List[Legend]]:
+    etype_colors: list[Color],
+    reverse_etypes: dict[str, str],
+) -> tuple[list[Color], list[Legend]]:
     edge_colors = []
     # reverse_etypes_tuples = _get_revese_etypes_tuple(reverse_etypes)
     ueid_master = _create_ueid_master(hetero_graph, reverse_etypes)
@@ -203,7 +216,7 @@ def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
 
 
 def _count_heterogeneous_edges(
-    graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
+    graph: dgl.DGLHeteroGraph, reverse_etypes: dict[str, str]
 ) -> int:
 
     num_directed_edge = len(
@@ -215,8 +228,8 @@ def _count_heterogeneous_edges(
 
 
 def _create_ueid_master(
-    hetero_graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
-) -> Dict[int, EdgeTypeInfo]:
+    hetero_graph: dgl.DGLHeteroGraph, reverse_etypes: dict[str, str]
+) -> dict[int, EdgeTypeInfo]:
     """
     Define the same ID for an edge and its reversed edge as Unique Edge ID (ueid).
     """
@@ -274,12 +287,12 @@ def _create_ueid_master(
 def plot_graph(
     graph: dgl.DGLGraph,
     title: str = "",
-    node_labels: Dict[int, str] = None,
+    node_labels: Union[dict[int, str], dict[str, dict[int, str]], None] = None,
     # edge_labels: Dict[int, str] = None,
-    ntype_colors: List[Color] = None,
-    etype_colors: List[Color] = None,
-    figsize: Tuple[int, int] = (6, 4),
-    reverse_etypes: Dict[str, str] = None,
+    ntype_colors: Union[list[Color], None] = None,
+    etype_colors: Union[list[Color], None] = None,
+    figsize: tuple[int, int] = (6, 4),
+    reverse_etypes: Union[dict[str, str], None] = None,
     **kwargs,
 ) -> matplotlib.axes.Axes:
 
@@ -343,7 +356,7 @@ def plot_graph(
 
 
 def _extract_subgraph_nhop(
-    g: dgl.DGLGraph, target_nodes: List[int], n_hop: int
+    g: dgl.DGLGraph, target_nodes: list[int], n_hop: int
 ) -> dgl.DGLGraph:
 
     seed_nodes = target_nodes
@@ -359,7 +372,7 @@ def _extract_subgraph_nhop(
 
 
 def _extract_heterogeneous_subgraph_nhop(
-    hetero_graph: dgl.DGLHeteroGraph, target_nodes: Dict[str, List[int]], n_hop: int
+    hetero_graph: dgl.DGLHeteroGraph, target_nodes: dict[str, list[int]], n_hop: int
 ) -> dgl.DGLHeteroGraph:
     seed_nodes = target_nodes
     for i in range(n_hop):
@@ -382,18 +395,38 @@ def _extract_heterogeneous_subgraph_nhop(
     return sg
 
 
+def _extract_sub_graph_nhop_fanouts(
+    graph: dgl.DGLGraph,
+    target_nodes: list[int],
+    n_hop: int,
+    fanouts: list[int],
+) -> dgl.DGLGraph:
+    # sampler = dgl.dataloading.NeighborSampler(fanouts)
+    # dataloader = dgl.dataloading.DataLoader(
+    #     graph,
+    #     target_nodes,
+    #     sampler,
+    #     batch_size=1,
+    #     shuffle=False,
+    #     drop_last=False,
+    # )
+    # input_nodes, output_nodes, blocks = next(iter(dataloader))
+
+    pass
+
+
 def plot_subgraph_with_neighbors(
     graph: dgl.DGLGraph,
-    target_nodes: Union[List[int], Dict[str, List[int]]],
+    target_nodes: Union[list[int], dict[str, list[int]]],
     n_hop: int,
-    fanouts: List[int] = None,
+    fanouts: Union[list[int], dict[str, list[int]], None] = None,
     title: str = "",
-    node_labels: Dict[int, str] = None,
+    node_labels: Union[dict[int, str], None] = None,
     # edge_labels: Dict[int, str] = None,
-    ntype_colors: List[Color] = None,
-    etype_colors: List[Color] = None,
-    figsize: Tuple[int, int] = (6, 4),
-    reverse_etypes: Dict[str, str] = None,
+    ntype_colors: Union[list[Color], None] = None,
+    etype_colors: Union[list[Color], None] = None,
+    figsize: tuple[int, int] = (6, 4),
+    reverse_etypes: Union[dict[str, str], None] = None,
     **kwargs,
 ) -> matplotlib.axes.Axes:
 
@@ -413,7 +446,10 @@ def plot_subgraph_with_neighbors(
             sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
 
     else:
-        pass
+        raise NotImplementedError()
+        # if graph.is_homogeneous:
+        #
+        # sg = _extract_sub_graph_nhop_fanouts(graph, target_nodes, n_hop, fanouts)
 
     return plot_graph(
         sg,
