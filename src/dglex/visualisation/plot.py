@@ -398,30 +398,93 @@ def _extract_heterogeneous_subgraph_nhop(
 def _extract_sub_graph_nhop_fanouts(
     graph: dgl.DGLGraph,
     target_nodes: list[int],
-    n_hop: int,
     fanouts: list[int],
-) -> dgl.DGLGraph:
-    # sampler = dgl.dataloading.NeighborSampler(fanouts)
-    # dataloader = dgl.dataloading.DataLoader(
-    #     graph,
-    #     target_nodes,
-    #     sampler,
-    #     batch_size=1,
-    #     shuffle=False,
-    #     drop_last=False,
-    # )
-    # input_nodes, output_nodes, blocks = next(iter(dataloader))
+    node_labels: Union[dict[int, str], None],
+) -> tuple[dgl.DGLGraph, dict[int, str]]:
 
-    pass
+    sampler = dgl.dataloading.NeighborSampler(fanouts)
+    dataloader = dgl.dataloading.DataLoader(
+        graph,
+        target_nodes,
+        sampler,
+        batch_size=1,
+        shuffle=False,
+        drop_last=False,
+    )
+    input_nodes, output_nodes, blocks = next(iter(dataloader))
+
+    _src = []
+    _dst = []
+
+    sampled_node_labels = {}
+    node_labels = {} if node_labels is None else node_labels
+    for i, block in enumerate(blocks):
+        src, dst = block.edges()
+        _src.extend(src.tolist())
+        _dst.extend(dst.tolist())
+
+    for i, nodes in enumerate(input_nodes.tolist()):
+        sampled_node_labels[i] = (
+            f"{nodes}" if i not in node_labels else node_labels[nodes]
+        )
+
+    sg = dgl.graph((_src, _dst))
+
+    return sg, sampled_node_labels
+
+
+def _extract_heterogeneous_sub_graph_nhop_fanouts(
+    graph: dgl.DGLHeteroGraph,
+    target_nodes: dict[str, list[int]],
+    fanouts: Union[list[int], list[dict[str, int]]],
+    node_labels: Union[dict[str, dict[int, str]], None],
+) -> tuple[dgl.DGLHeteroGraph, dict[int, str]]:
+
+    sampler = dgl.dataloading.NeighborSampler(fanouts)
+    dataloader = dgl.dataloading.DataLoader(
+        graph,
+        target_nodes,
+        sampler,
+        batch_size=1,
+        shuffle=False,
+        drop_last=False,
+    )
+    input_nodes, output_nodes, blocks = next(iter(dataloader))
+
+    graph_dic = {}
+    sampled_node_labels = {ntype: {} for ntype in graph.ntypes}
+    node_labels = (
+        {ntype: {} for ntype in graph.ntypes} if node_labels is None else node_labels
+    )
+
+    for src_ntype, etype, dst_ntype in graph.canonical_etypes:
+        _src = []
+        _dst = []
+        for i, block in enumerate(blocks):
+            src, dst = block.edges(etype=etype)
+            _src.extend(src.tolist())
+            _dst.extend(dst.tolist())
+
+        graph_dic[(src_ntype, etype, dst_ntype)] = (_src, _dst)
+
+    for ntype in graph.ntypes:
+        for i, nodes in enumerate(input_nodes[ntype].tolist()):
+            sampled_node_labels[ntype][i] = (
+                f"{nodes}" if i not in node_labels[ntype] else node_labels[ntype][nodes]
+            )
+
+    sg = dgl.heterograph(graph_dic)
+
+    return sg, sampled_node_labels
 
 
 def plot_subgraph_with_neighbors(
     graph: dgl.DGLGraph,
     target_nodes: Union[list[int], dict[str, list[int]]],
     n_hop: int,
-    fanouts: Union[list[int], dict[str, list[int]], None] = None,
+    fanouts: Union[list[int], list[dict[str, int]], None] = None,
     title: str = "",
-    node_labels: Union[dict[int, str], None] = None,
+    node_labels: Union[dict[int, str], dict[str, dict[int, str]], None] = None,
     # edge_labels: Dict[int, str] = None,
     ntype_colors: Union[list[Color], None] = None,
     etype_colors: Union[list[Color], None] = None,
@@ -446,10 +509,26 @@ def plot_subgraph_with_neighbors(
             sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
 
     else:
-        raise NotImplementedError()
-        # if graph.is_homogeneous:
-        #
-        # sg = _extract_sub_graph_nhop_fanouts(graph, target_nodes, n_hop, fanouts)
+
+        if graph.is_homogeneous:
+            assert (
+                type(target_nodes) == list
+            ), "target_nodes must be a list for homogeneous graph"
+            assert type(fanouts) == list, "fanouts must be a list for homogeneous graph"
+
+            sg, node_labels = _extract_sub_graph_nhop_fanouts(
+                graph, target_nodes, fanouts, node_labels
+            )
+
+        else:
+
+            assert (
+                type(target_nodes) == dict
+            ), "target_nodes must be a dictionary for heterogeneous graph"
+
+            sg, node_labels = _extract_heterogeneous_sub_graph_nhop_fanouts(
+                graph, target_nodes, fanouts, node_labels
+            )
 
     return plot_graph(
         sg,
