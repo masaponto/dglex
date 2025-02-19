@@ -1,0 +1,31 @@
+[project]
+name = "dglex"
+version = "0.1.0"
+description = "An extention library for DGL"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "dgl",
+    "matplotlib>=3.9.4",
+    "networkx>=3.2.1",
+    "seaborn>=0.13.2",
+    "torch==2.0.1",
+    "numpy>=1.26.4,<2"
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu" },
+]
+dgl = { url = "https://data.dgl.ai/wheels/dgl-1.0.2-cp39-cp39-manylinux1_x86_64.whl" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "pytest>=8.3.4",
+]
