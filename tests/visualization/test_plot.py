@@ -2,17 +2,16 @@ import pytest
 import dgl
 import numpy as np
 import matplotlib.pyplot as plt
-from dglex.visualisation.plot import plot_graph, plot_subgraph_with_neighbors
+from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
 from unittest.mock import patch
 
 
 @pytest.fixture
 def homogeneous_graph() -> dgl.DGLGraph:
-    n_users = 10
-    n_follows = 10
-    np.random.seed(42)
-    follow_src = np.random.randint(0, n_users, n_follows)
-    follow_dst = np.random.randint(0, n_users, n_follows)
+
+    # randomly generated
+    follow_src = np.array([6, 3, 7, 4, 6, 9, 2, 6, 7, 4])
+    follow_dst = np.array([3, 7, 7, 2, 5, 4, 1, 7, 5, 1])
 
     homo_graph = dgl.graph((follow_src, follow_dst))
 
@@ -21,19 +20,14 @@ def homogeneous_graph() -> dgl.DGLGraph:
 
 @pytest.fixture
 def heterogeneous_graph() -> dgl.DGLHeteroGraph:
-    n_users = 10
-    n_items = 10
-    n_follows = 10
-    n_clicks = 10
-    n_dislikes = 10
 
-    np.random.seed(42)
-    follow_src = np.random.randint(0, n_users, n_follows)
-    follow_dst = np.random.randint(0, n_users, n_follows)
-    click_src = np.random.randint(0, n_users, n_clicks)
-    click_dst = np.random.randint(0, n_items, n_clicks)
-    dislike_src = np.random.randint(0, n_users, n_dislikes)
-    dislike_dst = np.random.randint(0, n_items, n_dislikes)
+    # randomly generated
+    follow_src = np.array([6, 3, 7, 4, 6, 9, 2, 6, 7, 4])
+    follow_dst = np.array([3, 7, 7, 2, 5, 4, 1, 7, 5, 1])
+    click_src = np.array([4, 0, 9, 5, 8, 0, 9, 2, 6, 3])
+    click_dst = np.array([8, 2, 4, 2, 6, 4, 8, 6, 1, 3])
+    dislike_src = np.array([8, 1, 9, 8, 9, 4, 1, 3, 6, 7])
+    dislike_dst = np.array([2, 0, 3, 1, 7, 3, 1, 5, 5, 9])
 
     hetero_graph = dgl.heterograph(
         {
@@ -52,4 +46,22 @@ def heterogeneous_graph() -> dgl.DGLHeteroGraph:
 def test_plot_homogeneous_graph(homogeneous_graph):
     with patch("matplotlib.pyplot.plot") as mock_plot:
         ax = plot_graph(homogeneous_graph)
+        plt.plot()
+
+
+def test_plot_heterogeneous_graph(heterogeneous_graph):
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_graph(heterogeneous_graph)
+        plt.plot()
+
+
+def test_plot_subgraph_with_neighbors_homogeneous_graph(homogeneous_graph):
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_subgraph_with_neighbors(homogeneous_graph, [0], 1)
+        plt.plot()
+
+
+def test_plot_subgraph_with_neighbors_heterogeneous_graph(heterogeneous_graph):
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_subgraph_with_neighbors(heterogeneous_graph, {"item": 0}, 1)
         plt.plot()

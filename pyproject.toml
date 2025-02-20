@@ -3,6 +3,9 @@ name = "dglex"
 version = "0.1.0"
 description = "An extention library for DGL"
 readme = "README.md"
+authors = [
+    { name = "masaponto", email = "masaponto@gmail.com" }
+]
 requires-python = ">=3.9"
 dependencies = [
     "dgl",
@@ -23,6 +26,10 @@ dgl = { url = "https://data.dgl.ai/wheels/dgl-1.0.2-cp39-cp39-manylinux1_x86_64.
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
