@@ -500,12 +500,12 @@ def plot_subgraph_with_neighbors(
         if graph.is_homogeneous:
             assert (
                 type(target_nodes) == list
-            ), "target_nodes must be a list for homogeneous graph"
+            ), f"target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}"
             sg = _extract_subgraph_nhop(graph, target_nodes, n_hop)
         else:
             assert (
                 type(target_nodes) == dict
-            ), "target_nodes must be a dictionary for heterogeneous graph"
+            ), f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
             sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
 
     else:
@@ -513,8 +513,10 @@ def plot_subgraph_with_neighbors(
         if graph.is_homogeneous:
             assert (
                 type(target_nodes) == list
-            ), "target_nodes must be a list for homogeneous graph"
-            assert type(fanouts) == list, "fanouts must be a list for homogeneous graph"
+            ), f"target_nodes must be a list for homogeneous graph. the current target_nodes is {target_nodes}"
+            assert (
+                type(fanouts) == list
+            ), f"fanouts must be a list for homogeneous graph. The current fanouts is {fanouts}"
 
             sg, node_labels = _extract_sub_graph_nhop_fanouts(
                 graph, target_nodes, fanouts, node_labels
@@ -524,7 +526,11 @@ def plot_subgraph_with_neighbors(
 
             assert (
                 type(target_nodes) == dict
-            ), "target_nodes must be a dictionary for heterogeneous graph"
+            ), f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
+
+            assert all(
+                isinstance(value, list) for value in target_nodes.values()
+            ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
 
             sg, node_labels = _extract_heterogeneous_sub_graph_nhop_fanouts(
                 graph, target_nodes, fanouts, node_labels

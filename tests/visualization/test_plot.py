@@ -92,35 +92,35 @@ def test_plot_subgraph_with_neighbors_heterogeneous_graph(heterogeneous_graph):
         )
         plt.plot()
 
-    # with patch("matplotlib.pyplot.plot") as mock_plot:
-    #     ax = plot_subgraph_with_neighbors(
-    #         heterogeneous_graph, target_nodes={"user": 0}, n_hop=1, fanouts=[1]
-    #     )
-    #     plt.plot()
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_subgraph_with_neighbors(
+            heterogeneous_graph, target_nodes={"user": [0]}, n_hop=1, fanouts=[1]
+        )
+        plt.plot()
 
-    # with patch("matplotlib.pyplot.plot") as mock_plot:
-    #     ax = plot_subgraph_with_neighbors(
-    #         heterogeneous_graph,
-    #         target_nodes={"user": 0},
-    #         n_hop=2,
-    #         fanouts=[
-    #             {
-    #                 "click": 1,
-    #                 "clicked-by": 1,
-    #                 "dislike": 1,
-    #                 "disliked-by": 1,
-    #                 "follow": 1,
-    #                 "followed-by": 1,
-    #             },
-    #             {
-    #                 "click": 0,
-    #                 "clicked-by": 0,
-    #                 "dislike": 1,
-    #                 "disliked-by": 1,
-    #                 "follow": 0,
-    #                 "followed-by": 0,
-    #             },
-    #         ],
-    #     )
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_subgraph_with_neighbors(
+            heterogeneous_graph,
+            target_nodes={"user": [0]},
+            n_hop=2,
+            fanouts=[
+                {
+                    "click": 1,
+                    "clicked-by": 1,
+                    "dislike": 1,
+                    "disliked-by": 1,
+                    "follow": 1,
+                    "followed-by": 1,
+                },
+                {
+                    "click": 0,
+                    "clicked-by": 0,
+                    "dislike": 1,
+                    "disliked-by": 1,
+                    "follow": 0,
+                    "followed-by": 0,
+                },
+            ],
+        )
 
-    #     plt.plot()
+        plt.plot()
