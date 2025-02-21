@@ -54,14 +54,73 @@ def test_plot_heterogeneous_graph(heterogeneous_graph):
         ax = plot_graph(heterogeneous_graph)
         plt.plot()
 
+    # add revere etypes
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        reverse_etypes = {
+            "click": "clicked-by",
+            "dislike": "disliked-by",
+            "follow": "followed-by",
+            "followed-by": "follow",
+            "clicked-by": "click",
+            "disliked-by": "dislike",
+        }
+        ax = plot_graph(
+            heterogeneous_graph,
+            figsize=(10, 10),
+            title="graph",
+            reverse_etypes=reverse_etypes,
+        )
+        plt.plot()
+
 
 def test_plot_subgraph_with_neighbors_homogeneous_graph(homogeneous_graph):
     with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(homogeneous_graph, [0], 1)
+        ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0], n_hop=1)
+        plt.plot()
+
+    with patch("matplotlib.pyplot.plot") as mock_plot:
+        ax = plot_subgraph_with_neighbors(
+            homogeneous_graph, target_nodes=[0, 1], n_hop=1
+        )
         plt.plot()
 
 
 def test_plot_subgraph_with_neighbors_heterogeneous_graph(heterogeneous_graph):
     with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(heterogeneous_graph, {"item": 0}, 1)
+        ax = plot_subgraph_with_neighbors(
+            heterogeneous_graph, target_nodes={"item": 0}, n_hop=1
+        )
         plt.plot()
+
+    # with patch("matplotlib.pyplot.plot") as mock_plot:
+    #     ax = plot_subgraph_with_neighbors(
+    #         heterogeneous_graph, target_nodes={"user": 0}, n_hop=1, fanouts=[1]
+    #     )
+    #     plt.plot()
+
+    # with patch("matplotlib.pyplot.plot") as mock_plot:
+    #     ax = plot_subgraph_with_neighbors(
+    #         heterogeneous_graph,
+    #         target_nodes={"user": 0},
+    #         n_hop=2,
+    #         fanouts=[
+    #             {
+    #                 "click": 1,
+    #                 "clicked-by": 1,
+    #                 "dislike": 1,
+    #                 "disliked-by": 1,
+    #                 "follow": 1,
+    #                 "followed-by": 1,
+    #             },
+    #             {
+    #                 "click": 0,
+    #                 "clicked-by": 0,
+    #                 "dislike": 1,
+    #                 "disliked-by": 1,
+    #                 "follow": 0,
+    #                 "followed-by": 0,
+    #             },
+    #         ],
+    #     )
+
+    #     plt.plot()
