@@ -410,8 +410,11 @@ def _extract_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
+        num_workers=1,
     )
-    input_nodes, output_nodes, blocks = next(iter(dataloader))
+
+    with dataloader.enable_cpu_affinity():
+        input_nodes, output_nodes, blocks = next(iter(dataloader))
 
     _src = []
     _dst = []
@@ -448,8 +451,11 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
+        num_workers=1,
     )
-    input_nodes, output_nodes, blocks = next(iter(dataloader))
+
+    with dataloader.enable_cpu_affinity():
+        input_nodes, output_nodes, blocks = next(iter(dataloader))
 
     graph_dic = {}
     sampled_node_labels = {ntype: {} for ntype in graph.ntypes}
@@ -506,6 +512,11 @@ def plot_subgraph_with_neighbors(
             assert (
                 type(target_nodes) == dict
             ), f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
+
+            assert all(
+                isinstance(value, list) for value in target_nodes.values()
+            ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
+
             sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
 
     else:
