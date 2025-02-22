@@ -1,9 +1,13 @@
 import pytest
 import dgl
 import numpy as np
-import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
-from unittest.mock import patch
+
+# from unittest.mock import patch
+from pytest_mock import MockerFixture
+import networkx
 
 
 @pytest.fixture
@@ -43,84 +47,98 @@ def heterogeneous_graph() -> dgl.DGLHeteroGraph:
     return hetero_graph
 
 
-def test_plot_homogeneous_graph(homogeneous_graph):
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_graph(homogeneous_graph)
-        plt.plot()
+@pytest.fixture
+def mock_nx_draw(mocker: MockerFixture):
+    return mocker.patch("networkx.draw")
 
 
-def test_plot_heterogeneous_graph(heterogeneous_graph):
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_graph(heterogeneous_graph)
-        plt.plot()
+def test_plot_homogeneous_graph(
+    homogeneous_graph: dgl.DGLGraph, mock_nx_draw: MockerFixture
+):
+    ax = plot_graph(homogeneous_graph)
+    mock_nx_draw.assert_called_once()
+
+
+def test_plot_heterogeneous_graph(
+    heterogeneous_graph: dgl.DGLHeteroGraph, mock_nx_draw: MockerFixture
+):
+
+    ax = plot_graph(heterogeneous_graph)
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()  # reset mock for next test
 
     # add revere etypes
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        reverse_etypes = {
-            "click": "clicked-by",
-            "dislike": "disliked-by",
-            "follow": "followed-by",
-            "followed-by": "follow",
-            "clicked-by": "click",
-            "disliked-by": "dislike",
-        }
-        ax = plot_graph(
-            heterogeneous_graph,
-            figsize=(10, 10),
-            title="graph",
-            reverse_etypes=reverse_etypes,
-        )
-        plt.plot()
+    reverse_etypes = {
+        "click": "clicked-by",
+        "dislike": "disliked-by",
+        "follow": "followed-by",
+        "followed-by": "follow",
+        "clicked-by": "click",
+        "disliked-by": "dislike",
+    }
+    ax = plot_graph(
+        heterogeneous_graph,
+        figsize=(10, 10),
+        title="graph",
+        reverse_etypes=reverse_etypes,
+    )
+
+    mock_nx_draw.assert_called_once()
 
 
-def test_plot_subgraph_with_neighbors_homogeneous_graph(homogeneous_graph):
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0], n_hop=1)
-        plt.plot()
+def test_plot_subgraph_with_neighbors_homogeneous_graph(
+    homogeneous_graph: dgl.DGLHeteroGraph,
+    mock_nx_draw: MockerFixture,
+):
 
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(
-            homogeneous_graph, target_nodes=[0, 1], n_hop=1
-        )
-        plt.plot()
+    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0], n_hop=1)
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0, 1], n_hop=1)
+    mock_nx_draw.assert_called_once()
 
 
-def test_plot_subgraph_with_neighbors_heterogeneous_graph(heterogeneous_graph):
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(
-            heterogeneous_graph, target_nodes={"item": 0}, n_hop=1
-        )
-        plt.plot()
+def test_plot_subgraph_with_neighbors_heterogeneous_graph(
+    heterogeneous_graph: dgl.DGLHeteroGraph,
+    mock_nx_draw: MockerFixture,
+):
 
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(
-            heterogeneous_graph, target_nodes={"user": [0]}, n_hop=1, fanouts=[1]
-        )
-        plt.plot()
+    ax = plot_subgraph_with_neighbors(
+        heterogeneous_graph, target_nodes={"item": [0]}, n_hop=1
+    )
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
 
-    with patch("matplotlib.pyplot.plot") as mock_plot:
-        ax = plot_subgraph_with_neighbors(
-            heterogeneous_graph,
-            target_nodes={"user": [0]},
-            n_hop=2,
-            fanouts=[
-                {
-                    "click": 1,
-                    "clicked-by": 1,
-                    "dislike": 1,
-                    "disliked-by": 1,
-                    "follow": 1,
-                    "followed-by": 1,
-                },
-                {
-                    "click": 0,
-                    "clicked-by": 0,
-                    "dislike": 1,
-                    "disliked-by": 1,
-                    "follow": 0,
-                    "followed-by": 0,
-                },
-            ],
-        )
+    ax = plot_subgraph_with_neighbors(
+        heterogeneous_graph, target_nodes={"user": [0]}, n_hop=1, fanouts=[1]
+    )
 
-        plt.plot()
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    ax = plot_subgraph_with_neighbors(
+        heterogeneous_graph,
+        target_nodes={"user": [0]},
+        n_hop=2,
+        fanouts=[
+            {
+                "click": 1,
+                "clicked-by": 1,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 1,
+                "followed-by": 1,
+            },
+            {
+                "click": 0,
+                "clicked-by": 0,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 0,
+                "followed-by": 0,
+            },
+        ],
+    )
+
+    mock_nx_draw.assert_called_once()
