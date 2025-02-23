@@ -2,12 +2,14 @@ import dgl
 import torch
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import networkx as nx
 import seaborn as sns
 
 from typing import Union
 from collections import defaultdict
 from dataclasses import dataclass
+
 
 # Type aliases
 Color = Union[str, tuple[float]]
@@ -95,6 +97,35 @@ def _get_colors(
     return colors
 
 
+def _get_colormap_from_base_color(base_color: Color) -> mcolors.LinearSegmentedColormap:
+    light_color = sns.blend_palette(["white", base_color], as_cmap=False)[1]
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "custom_cmap", [light_color, base_color]
+    )
+    return cmap
+
+
+def _get_colors_from_weights(
+    base_color: Color, weight_list: list[float]
+) -> list[Color]:
+
+    min_weight = min(weight_list)
+    max_weight = max(weight_list)
+
+    if min_weight < 0:
+        weight_list = [w - min_weight for w in weight_list]
+        max_weight -= min_weight
+
+    if max_weight > 1:
+        weight_list = [w / max_weight for w in weight_list]
+
+    cmap = _get_colormap_from_base_color(base_color)
+
+    colors = [cmap(w) for w in weight_list]
+
+    return colors
+
+
 def _get_homogeneous_node_colors_and_legend(
     ntype_colors: list[Color],
 ) -> tuple[list[Color], list[Legend]]:
@@ -135,9 +166,14 @@ def _get_heterogenous_node_colors_and_legend(
 
 
 def _get_homogeneous_edge_colors_and_legend(
-    etype_colors: list[Color],
+    etype_colors: list[Color], edge_weight: Union[torch.Tensor, None] = None
 ) -> tuple[list[Color], list[Legend]]:
-    edge_colors = etype_colors
+
+    if edge_weight is None:
+        edge_colors = etype_colors
+    else:
+        edge_colors = _get_colors_from_weights(etype_colors[0], edge_weight.tolist())
+
     edge_legend = [
         plt.Line2D(
             [0],
@@ -156,11 +192,30 @@ def _get_heterogeneous_edge_colors_and_legend(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
     etype_colors: list[Color],
+    edge_weight: Union[dict[tuple[str, str, str], torch.Tensor], None] = None,
 ) -> tuple[list[Color], list[Legend]]:
 
-    edge_colors = [
-        etype_colors[edata[2][dgl.ETYPE].item()] for edata in ng.edges(data=True)
-    ]
+    if edge_weight is None:
+
+        edge_colors = [
+            etype_colors[edata[2][dgl.ETYPE].item()] for edata in ng.edges(data=True)
+        ]
+
+    else:
+
+        _etype_colors_with_weight = []
+        for i, canonical_etype in enumerate(hetero_graph.canonical_etypes):
+            _edge_weight = edge_weight[canonical_etype].tolist()
+            _etype_colors_with_weight.append(
+                _get_colors_from_weights(etype_colors[i], _edge_weight)
+            )
+
+        edge_colors = [
+            _etype_colors_with_weight[edata[2][dgl.ETYPE].item()][
+                edata[2][dgl.EID].item()
+            ]
+            for edata in ng.edges(data=True)
+        ]
 
     edge_legend = [
         plt.Line2D(
@@ -183,15 +238,33 @@ def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
     ng: nx.Graph,
     etype_colors: list[Color],
     reverse_etypes: dict[str, str],
+    edge_weight: Union[dict[tuple[str, str, str], torch.Tensor], None] = None,
 ) -> tuple[list[Color], list[Legend]]:
     edge_colors = []
     # reverse_etypes_tuples = _get_revese_etypes_tuple(reverse_etypes)
     ueid_master = _create_ueid_master(hetero_graph, reverse_etypes)
 
-    edge_colors = [
-        etype_colors[ueid_master[edata[2][dgl.ETYPE].item()].ueid]
-        for edata in ng.edges(data=True)
-    ]
+    if edge_weight is None:
+        edge_colors = [
+            etype_colors[ueid_master[edata[2][dgl.ETYPE].item()].ueid]
+            for edata in ng.edges(data=True)
+        ]
+    else:
+        _etype_colors_with_weight = []
+        for i, canonical_etype in enumerate(hetero_graph.canonical_etypes):
+            _edge_weight = edge_weight[canonical_etype].tolist()
+            _etype_colors_with_weight.append(
+                _get_colors_from_weights(
+                    etype_colors[ueid_master[i].ueid], _edge_weight
+                )
+            )
+
+        edge_colors = [
+            _etype_colors_with_weight[edata[2][dgl.ETYPE].item()][
+                edata[2][dgl.EID].item()
+            ]
+            for edata in ng.edges(data=True)
+        ]
 
     edge_legend = []
     processed_ueid = []
@@ -288,7 +361,7 @@ def plot_graph(
     graph: dgl.DGLGraph,
     title: str = "",
     node_labels: Union[dict[int, str], dict[str, dict[int, str]], None] = None,
-    # edge_labels: Dict[int, str] = None,
+    edge_weight_name: Union[str, None] = None,
     ntype_colors: Union[list[Color], None] = None,
     etype_colors: Union[list[Color], None] = None,
     figsize: tuple[int, int] = (6, 4),
@@ -303,8 +376,19 @@ def plot_graph(
         node_labels = _get_homogenous_node_labels(graph, ng, node_labels)
         ntype_colors = _get_colors(1, ntype_colors)
         etype_colors = _get_colors(1, etype_colors)
+        edge_weight: torch.Tensor = (
+            graph.edata[edge_weight_name] if edge_weight_name else None
+        )
+
+        if edge_weight is not None and edge_weight.ndimension() > 1:
+            raise ValueError(
+                f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
+            )
+
         node_colors, node_legend = _get_homogeneous_node_colors_and_legend(ntype_colors)
-        edge_colors, edge_legend = _get_homogeneous_edge_colors_and_legend(etype_colors)
+        edge_colors, edge_legend = _get_homogeneous_edge_colors_and_legend(
+            etype_colors, edge_weight
+        )
 
     else:
         # heterogeneous graph
@@ -320,8 +404,20 @@ def plot_graph(
 
         if reverse_etypes is None:
             etype_colors = _get_colors(len(graph.etypes), etype_colors)
+
+            edge_weight: dict[tuple[str, str, str], torch.Tensor] = (
+                graph.edata[edge_weight_name] if edge_weight_name else None
+            )
+
+            # TODO: refactor
+            if edge_weight is not None:
+                for _, _weight in edge_weight.items():
+                    if _weight.ndimension() > 1:
+                        raise ValueError(
+                            f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
+                        )
             edge_colors, edge_legend = _get_heterogeneous_edge_colors_and_legend(
-                graph, ng, etype_colors
+                graph, ng, etype_colors, edge_weight
             )
 
         else:
@@ -335,9 +431,21 @@ def plot_graph(
             etype_colors = _get_colors(
                 _count_heterogeneous_edges(graph, reverse_etypes), etype_colors
             )
+            edge_weight: dict[tuple[str, str, str], torch.Tensor] = (
+                graph.edata[edge_weight_name] if edge_weight_name else None
+            )
+
+            # TODO: refactor
+            if edge_weight is not None:
+                for _, _weight in edge_weight.items():
+                    if _weight.ndimension() > 1:
+                        raise ValueError(
+                            f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
+                        )
+
             edge_colors, edge_legend = (
                 _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
-                    graph, ng, etype_colors, reverse_etypes
+                    graph, ng, etype_colors, reverse_etypes, edge_weight
                 )
             )
 
@@ -549,11 +657,11 @@ def plot_subgraph_with_neighbors(
 
     return plot_graph(
         sg,
-        title,
-        node_labels,
-        ntype_colors,
-        etype_colors,
-        figsize,
-        reverse_etypes,
+        title=title,
+        node_labels=node_labels,
+        ntype_colors=ntype_colors,
+        etype_colors=etype_colors,
+        figsize=figsize,
+        reverse_etypes=reverse_etypes,
         **kwargs,
     )

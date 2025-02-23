@@ -1,6 +1,7 @@
 import pytest
 import dgl
 import numpy as np
+import torch
 
 # import matplotlib.pyplot as plt
 from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
@@ -18,6 +19,10 @@ def homogeneous_graph() -> dgl.DGLGraph:
     follow_dst = np.array([3, 7, 7, 2, 5, 4, 1, 7, 5, 1])
 
     homo_graph = dgl.graph((follow_src, follow_dst))
+
+    homo_graph.edata["weight"] = torch.Tensor(
+        [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    )
 
     return homo_graph
 
@@ -58,6 +63,11 @@ def test_plot_homogeneous_graph(
     ax = plot_graph(homogeneous_graph)
     mock_nx_draw.assert_called_once()
 
+    mock_nx_draw.reset_mock()  # reset mock for next test
+    ax = plot_graph(homogeneous_graph, edge_wegihts="weight")
+
+    mock_nx_draw.assert_called_once()
+
 
 def test_plot_heterogeneous_graph(
     heterogeneous_graph: dgl.DGLHeteroGraph, mock_nx_draw: MockerFixture
@@ -83,6 +93,20 @@ def test_plot_heterogeneous_graph(
         reverse_etypes=reverse_etypes,
     )
 
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # test with edge weights
+    ax = plot_graph(heterogeneous_graph, edge_wegihts="weight")
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # test with edge weights and reverse etypes
+    ax = plot_graph(
+        heterogeneous_graph,
+        edge_wegihts="weight",
+        reverse_etypes=reverse_etypes,
+    )
     mock_nx_draw.assert_called_once()
 
 
