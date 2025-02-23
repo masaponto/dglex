@@ -121,6 +121,13 @@ def test_plot_subgraph_with_neighbors_homogeneous_graph(
 
     ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0, 1], n_hop=1)
     mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # test with edge weights
+    ax = plot_subgraph_with_neighbors(
+        homogeneous_graph, target_nodes=[0, 1], n_hop=1, edge_wegihts="weight"
+    )
+    mock_nx_draw.assert_called_once()
 
 
 def test_plot_subgraph_with_neighbors_heterogeneous_graph(

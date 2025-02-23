@@ -109,6 +109,9 @@ def _get_colors_from_weights(
     base_color: Color, weight_list: list[float]
 ) -> list[Color]:
 
+    if len(weight_list) == 0:
+        return []
+
     min_weight = min(weight_list)
     max_weight = max(weight_list)
 
@@ -416,6 +419,7 @@ def plot_graph(
                         raise ValueError(
                             f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
                         )
+
             edge_colors, edge_legend = _get_heterogeneous_edge_colors_and_legend(
                 graph, ng, etype_colors, edge_weight
             )
@@ -464,8 +468,11 @@ def plot_graph(
 
 
 def _extract_subgraph_nhop(
-    g: dgl.DGLGraph, target_nodes: list[int], n_hop: int
-) -> dgl.DGLGraph:
+    g: dgl.DGLGraph,
+    target_nodes: list[int],
+    n_hop: int,
+    node_labels: Union[dict[int, str], None] = None,
+) -> tuple[dgl.DGLGraph, dict[int, str]]:
 
     seed_nodes = target_nodes
     for _i in range(n_hop):
@@ -476,12 +483,20 @@ def _extract_subgraph_nhop(
         src, dst = sg.edges()
         seed_nodes = torch.cat([src, dst]).unique()
 
-    return sg
+    sampled_node_labels = {
+        i: str(n) if node_labels is None else node_labels[n]
+        for i, n in enumerate(sg.ndata[dgl.NID].tolist())
+    }
+
+    return sg, sampled_node_labels
 
 
 def _extract_heterogeneous_subgraph_nhop(
-    hetero_graph: dgl.DGLHeteroGraph, target_nodes: dict[str, list[int]], n_hop: int
-) -> dgl.DGLHeteroGraph:
+    hetero_graph: dgl.DGLHeteroGraph,
+    target_nodes: dict[str, list[int]],
+    n_hop: int,
+    node_labels: Union[dict[str, dict[int, str]], None] = None,
+) -> tuple[dgl.DGLHeteroGraph, dict[int, str]]:
     seed_nodes = target_nodes
     for i in range(n_hop):
 
@@ -500,7 +515,14 @@ def _extract_heterogeneous_subgraph_nhop(
             seed_nodes[src_ntype] = list(set(seed_nodes[src_ntype]))
             seed_nodes[dst_ntype] = list(set(seed_nodes[dst_ntype]))
 
-    return sg
+    sampled_node_labels = {}
+    for ntype in hetero_graph.ntypes:
+        sampled_node_labels[ntype] = {
+            i: f"{ntype}_{n}" if node_labels is None else node_labels[ntype][n]
+            for i, n in enumerate(sg.ndata[dgl.NID][ntype].tolist())
+        }
+
+    return sg, sampled_node_labels
 
 
 def _extract_sub_graph_nhop_fanouts(
@@ -600,6 +622,7 @@ def plot_subgraph_with_neighbors(
     title: str = "",
     node_labels: Union[dict[int, str], dict[str, dict[int, str]], None] = None,
     # edge_labels: Dict[int, str] = None,
+    edge_weight_name: Union[str, None] = None,
     ntype_colors: Union[list[Color], None] = None,
     etype_colors: Union[list[Color], None] = None,
     figsize: tuple[int, int] = (6, 4),
@@ -615,7 +638,9 @@ def plot_subgraph_with_neighbors(
             assert (
                 type(target_nodes) == list
             ), f"target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}"
-            sg = _extract_subgraph_nhop(graph, target_nodes, n_hop)
+            sg, node_labels = _extract_subgraph_nhop(
+                graph, target_nodes, n_hop, node_labels
+            )
         else:
             assert (
                 type(target_nodes) == dict
@@ -625,7 +650,9 @@ def plot_subgraph_with_neighbors(
                 isinstance(value, list) for value in target_nodes.values()
             ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
 
-            sg = _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop)
+            sg, node_labels = _extract_heterogeneous_subgraph_nhop(
+                graph, target_nodes, n_hop
+            )
 
     else:
 
@@ -661,6 +688,7 @@ def plot_subgraph_with_neighbors(
         node_labels=node_labels,
         ntype_colors=ntype_colors,
         etype_colors=etype_colors,
+        edge_weight_name=edge_weight_name,
         figsize=figsize,
         reverse_etypes=reverse_etypes,
         **kwargs,
