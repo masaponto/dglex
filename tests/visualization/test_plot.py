@@ -28,7 +28,9 @@ def homogeneous_graph() -> dgl.DGLGraph:
 
 
 @pytest.fixture
-def heterogeneous_graph() -> dgl.DGLHeteroGraph:
+def heterogeneous_graph_and_reverse_etypes() -> (
+    tuple[dgl.DGLHeteroGraph, dict[str, str]]
+):
 
     # randomly generated
     follow_src = np.array([6, 3, 7, 4, 6, 9, 2, 6, 7, 4])
@@ -49,7 +51,37 @@ def heterogeneous_graph() -> dgl.DGLHeteroGraph:
         }
     )
 
-    return hetero_graph
+    hetero_graph.edata["weight"] = {
+        ("user", "follow", "user"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+        ("user", "followed-by", "user"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+        ("user", "click", "item"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+        ("item", "clicked-by", "user"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+        ("user", "dislike", "item"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+        ("item", "disliked-by", "user"): torch.Tensor(
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        ),
+    }
+
+    reverse_etypes = {
+        "click": "clicked-by",
+        "dislike": "disliked-by",
+        "follow": "followed-by",
+        "followed-by": "follow",
+        "clicked-by": "click",
+        "disliked-by": "dislike",
+    }
+
+    return hetero_graph, reverse_etypes
 
 
 @pytest.fixture
@@ -62,30 +94,24 @@ def test_plot_homogeneous_graph(
 ):
     ax = plot_graph(homogeneous_graph)
     mock_nx_draw.assert_called_once()
-
     mock_nx_draw.reset_mock()  # reset mock for next test
-    ax = plot_graph(homogeneous_graph, edge_wegihts="weight")
 
+    ax = plot_graph(homogeneous_graph, edge_wegiht_name="weight")
     mock_nx_draw.assert_called_once()
 
 
 def test_plot_heterogeneous_graph(
-    heterogeneous_graph: dgl.DGLHeteroGraph, mock_nx_draw: MockerFixture
+    heterogeneous_graph_and_reverse_etypes: tuple[dgl.DGLHeteroGraph, dict[str, str]],
+    mock_nx_draw: MockerFixture,
 ):
+    heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
 
     ax = plot_graph(heterogeneous_graph)
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()  # reset mock for next test
 
     # add revere etypes
-    reverse_etypes = {
-        "click": "clicked-by",
-        "dislike": "disliked-by",
-        "follow": "followed-by",
-        "followed-by": "follow",
-        "clicked-by": "click",
-        "disliked-by": "dislike",
-    }
+
     ax = plot_graph(
         heterogeneous_graph,
         figsize=(10, 10),
@@ -97,17 +123,23 @@ def test_plot_heterogeneous_graph(
     mock_nx_draw.reset_mock()
 
     # test with edge weights
-    ax = plot_graph(heterogeneous_graph, edge_wegihts="weight")
+    ax = plot_graph(heterogeneous_graph, edge_wegiht_name="weight")
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()
 
     # test with edge weights and reverse etypes
     ax = plot_graph(
         heterogeneous_graph,
-        edge_wegihts="weight",
+        edge_wegiht_name="weight",
         reverse_etypes=reverse_etypes,
     )
     mock_nx_draw.assert_called_once()
+
+    ax = plot_graph(
+        heterogeneous_graph,
+        edge_wegiht_name="weight",
+        reverse_etypes=reverse_etypes,
+    )
 
 
 def test_plot_subgraph_with_neighbors_homogeneous_graph(
@@ -115,39 +147,59 @@ def test_plot_subgraph_with_neighbors_homogeneous_graph(
     mock_nx_draw: MockerFixture,
 ):
 
-    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0], n_hop=1)
+    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[2], n_hop=1)
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()
 
-    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0, 1], n_hop=1)
+    # target nodes with multiple nodes
+    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[1, 2], n_hop=1)
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # test two hop
+    ax = plot_subgraph_with_neighbors(homogeneous_graph, target_nodes=[0, 1], n_hop=2)
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()
 
     # test with edge weights
     ax = plot_subgraph_with_neighbors(
-        homogeneous_graph, target_nodes=[0, 1], n_hop=1, edge_wegihts="weight"
+        homogeneous_graph, target_nodes=[0, 1], n_hop=1, edge_weight_name="weight"
+    )
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # test with fanouts
+    ax = plot_subgraph_with_neighbors(
+        homogeneous_graph,
+        target_nodes=[1, 2],
+        n_hop=2,
+        edge_weight_name="weight",
+        fanouts=[2, 2],
     )
     mock_nx_draw.assert_called_once()
 
 
 def test_plot_subgraph_with_neighbors_heterogeneous_graph(
-    heterogeneous_graph: dgl.DGLHeteroGraph,
+    heterogeneous_graph_and_reverse_etypes: tuple[dgl.DGLHeteroGraph, dict[str, str]],
     mock_nx_draw: MockerFixture,
 ):
+    heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
 
+    # plot subgraph with neighbors
     ax = plot_subgraph_with_neighbors(
         heterogeneous_graph, target_nodes={"item": [0]}, n_hop=1
     )
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()
 
+    # plot subgraph with neighbors with multiple nodes
     ax = plot_subgraph_with_neighbors(
-        heterogeneous_graph, target_nodes={"user": [0]}, n_hop=1, fanouts=[1]
+        heterogeneous_graph, target_nodes={"user": [0, 1]}, n_hop=1, fanouts=[1]
     )
-
     mock_nx_draw.assert_called_once()
     mock_nx_draw.reset_mock()
 
+    # plot subgraph with neighbors with fanouts
     ax = plot_subgraph_with_neighbors(
         heterogeneous_graph,
         target_nodes={"user": [0]},
@@ -173,3 +225,63 @@ def test_plot_subgraph_with_neighbors_heterogeneous_graph(
     )
 
     mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # plot subgraph with neighbors with reverse etypes
+    ax = plot_subgraph_with_neighbors(
+        heterogeneous_graph,
+        target_nodes={"user": [0]},
+        n_hop=2,
+        fanouts=[
+            {
+                "click": 1,
+                "clicked-by": 1,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 1,
+                "followed-by": 1,
+            },
+            {
+                "click": 0,
+                "clicked-by": 0,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 0,
+                "followed-by": 0,
+            },
+        ],
+        reverse_etypes=reverse_etypes,
+    )
+
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
+
+    # plot subgraph with neighbors with reverse etypes and edge weight
+    ax = plot_subgraph_with_neighbors(
+        heterogeneous_graph,
+        target_nodes={"user": [0]},
+        n_hop=2,
+        fanouts=[
+            {
+                "click": 1,
+                "clicked-by": 1,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 1,
+                "followed-by": 1,
+            },
+            {
+                "click": 0,
+                "clicked-by": 0,
+                "dislike": 1,
+                "disliked-by": 1,
+                "follow": 0,
+                "followed-by": 0,
+            },
+        ],
+        reverse_etypes=reverse_etypes,
+        edge_weight_name="weight",
+    )
+
+    mock_nx_draw.assert_called_once()
+    mock_nx_draw.reset_mock()
