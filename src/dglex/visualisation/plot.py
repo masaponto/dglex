@@ -30,7 +30,7 @@ def _plot(
     node_labels: Union[dict[int, str], None] = None,
     node_colors: Union[list[Color], None] = None,
     node_legend: Union[list[Legend], None] = None,
-    # edge_labels: Dict[int, str] = None,
+    edge_labels: Union[dict[tuple[int, int], float], None] = None,
     edge_colors: Union[list[Color], None] = None,
     edge_legend: Union[list[Legend], None] = None,
     figsize: tuple[int, int] = (10, 10),
@@ -50,6 +50,9 @@ def _plot(
         **kwargs,
     )
 
+    if edge_labels is not None:
+        nx.draw_networkx_edge_labels(nx_g, pos, edge_labels=edge_labels)
+
     plt.legend(handles=node_legend + edge_legend, loc="best")
     ax.set_title(title)
 
@@ -63,6 +66,23 @@ def _get_homogenous_node_labels(
         node_labels = {k: str(k) for k in ng.nodes()}
     assert len(node_labels) == graph.number_of_nodes(), "Not enough node labels"
     return node_labels
+
+
+def _get_homogeneous_edge_labels(
+    graph: dgl.DGLGraph, edge_weight: Union[torch.Tensor, None]
+) -> Union[dict[tuple[int, int], str], None]:
+
+    if edge_weight is None:
+        return None
+
+    edge_labels = {
+        (src.item(), dst.item()): f"{weight:.3f}"
+        for src, dst, weight in zip(
+            graph.edges()[0], graph.edges()[1], edge_weight.tolist()
+        )
+    }
+
+    return edge_labels
 
 
 def _get_heterogenous_node_labels(
@@ -87,6 +107,29 @@ def _get_heterogenous_node_labels(
         node_labels = _node_labels
     assert len(node_labels) == hetero_graph.number_of_nodes(), "Not enough node labels"
     return node_labels
+
+
+def _get_heterogeneous_edge_labels(
+    hetero_graph: dgl.DGLHeteroGraph,
+    ng: nx.Graph,
+    edge_weight: Union[dict[tuple[str, str, str], torch.Tensor], None],
+) -> Union[dict[tuple[int, int], str], None]:
+
+    if edge_weight is None:
+        return None
+
+    _edge_weight = [
+        edge_weight[etype].tolist() for etype in hetero_graph.canonical_etypes
+    ]
+
+    edge_labels = {}
+    for edata in ng.edges(data=True):
+        _etype_index = edata[2][dgl.ETYPE].item()
+        _eid = edata[2][dgl.EID].item()
+        _weight = _edge_weight[_etype_index][_eid]
+        edge_labels[(edata[0], edata[1])] = f"{_weight:.3f}"
+
+    return edge_labels
 
 
 def _get_colors(
@@ -236,16 +279,39 @@ def _get_heterogeneous_edge_colors_and_legend(
     return edge_colors, edge_legend
 
 
+def _get_heterogeneous_edge_labels_reverse_etypes(
+    hetero_graph: dgl.DGLHeteroGraph,
+    ng: nx.Graph,
+    edge_weight: Union[dict[tuple[str, str, str], torch.Tensor], None],
+) -> Union[dict[tuple[int, int], str], None]:
+
+    if edge_weight is None:
+        return None
+
+    _edge_weight = [
+        edge_weight[etype].tolist() for etype in hetero_graph.canonical_etypes
+    ]
+
+    edge_labels = {}
+    for edata in ng.edges(data=True):
+        _etype_index = edata[2][dgl.ETYPE].item()
+        _eid = edata[2][dgl.EID].item()
+        # _weight = _edge_weight[ueid_master[_etype_index].ueid][_eid]
+        _weight = _edge_weight[_etype_index][_eid]
+        edge_labels[(edata[0], edata[1])] = f"{_weight:.3f}"
+
+    return edge_labels
+
+
 def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
     etype_colors: list[Color],
-    reverse_etypes: dict[str, str],
+    ueid_master: dict[int, EdgeTypeInfo],
     edge_weight: Union[dict[tuple[str, str, str], torch.Tensor], None] = None,
 ) -> tuple[list[Color], list[Legend]]:
     edge_colors = []
     # reverse_etypes_tuples = _get_revese_etypes_tuple(reverse_etypes)
-    ueid_master = _create_ueid_master(hetero_graph, reverse_etypes)
 
     if edge_weight is None:
         edge_colors = [
@@ -379,7 +445,7 @@ def plot_graph(
         node_labels = _get_homogenous_node_labels(graph, ng, node_labels)
         ntype_colors = _get_colors(1, ntype_colors)
         etype_colors = _get_colors(1, etype_colors)
-        edge_weight: torch.Tensor = (
+        edge_weight: Union[torch.Tensor, None] = (
             graph.edata[edge_weight_name] if edge_weight_name else None
         )
 
@@ -387,6 +453,8 @@ def plot_graph(
             raise ValueError(
                 f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
             )
+
+        edge_labels = _get_homogeneous_edge_labels(graph, edge_weight)
 
         node_colors, node_legend = _get_homogeneous_node_colors_and_legend(ntype_colors)
         edge_colors, edge_legend = _get_homogeneous_edge_colors_and_legend(
@@ -420,6 +488,8 @@ def plot_graph(
                             f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
                         )
 
+            edge_labels = _get_heterogeneous_edge_labels(graph, ng, edge_weight)
+
             edge_colors, edge_legend = _get_heterogeneous_edge_colors_and_legend(
                 graph, ng, etype_colors, edge_weight
             )
@@ -447,9 +517,13 @@ def plot_graph(
                             f"edge_weight must be 1D. The current shape is {edge_weight.shape}"
                         )
 
+            ueid_master = _create_ueid_master(graph, reverse_etypes)
+            edge_labels = _get_heterogeneous_edge_labels_reverse_etypes(
+                graph, ng, edge_weight
+            )
             edge_colors, edge_legend = (
                 _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
-                    graph, ng, etype_colors, reverse_etypes, edge_weight
+                    graph, ng, etype_colors, ueid_master, edge_weight
                 )
             )
 
@@ -459,7 +533,7 @@ def plot_graph(
         node_labels=node_labels,
         node_colors=node_colors,
         node_legend=node_legend,
-        # edge_labels=edge_labels,
+        edge_labels=edge_labels,
         edge_colors=edge_colors,
         edge_legend=edge_legend,
         figsize=figsize,
