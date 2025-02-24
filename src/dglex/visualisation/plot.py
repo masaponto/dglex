@@ -64,7 +64,9 @@ def _get_homogenous_node_labels(
 ) -> dict[int, str]:
     if node_labels is None:
         node_labels = {k: str(k) for k in ng.nodes()}
-    assert len(node_labels) == graph.number_of_nodes(), "Not enough node labels"
+    assert (
+        len(node_labels) == graph.number_of_nodes()
+    ), f"Not enough node labels, node_labels: {len(node_labels)}, graph: {graph.number_of_nodes()}"
     return node_labels
 
 
@@ -439,6 +441,10 @@ def plot_graph(
 ) -> matplotlib.axes.Axes:
 
     if graph.is_homogeneous:
+
+        if graph.num_nodes() == 0:
+            raise ValueError(f"graph must have nodes, {graph}")
+
         node_attrs = [dgl.NID] if dgl.NID in graph.ndata else []
         edge_attrs = [dgl.EID] if dgl.EID in graph.edata else []
         ng = dgl.to_networkx(graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
@@ -604,6 +610,7 @@ def _extract_sub_graph_nhop_fanouts(
     target_nodes: list[int],
     fanouts: list[int],
     node_labels: Union[dict[int, str], None],
+    edge_weight_name: Union[str, None],
 ) -> tuple[dgl.DGLGraph, dict[int, str]]:
 
     sampler = dgl.dataloading.NeighborSampler(fanouts)
@@ -622,7 +629,7 @@ def _extract_sub_graph_nhop_fanouts(
 
     _src = []
     _dst = []
-
+    _edge_weight = []
     sampled_node_labels = {}
     node_labels = {} if node_labels is None else node_labels
     for i, block in enumerate(blocks):
@@ -630,12 +637,18 @@ def _extract_sub_graph_nhop_fanouts(
         _src.extend(src.tolist())
         _dst.extend(dst.tolist())
 
+        if edge_weight_name is not None:
+            ew = block.edata[edge_weight_name]
+            _edge_weight.extend(ew.tolist())
+
     for i, nodes in enumerate(input_nodes.tolist()):
         sampled_node_labels[i] = (
             f"{nodes}" if i not in node_labels else node_labels[nodes]
         )
 
     sg = dgl.graph((_src, _dst))
+    if edge_weight_name is not None:
+        sg.edata[edge_weight_name] = torch.tensor(_edge_weight)
 
     return sg, sampled_node_labels
 
@@ -645,6 +658,7 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
     target_nodes: dict[str, list[int]],
     fanouts: Union[list[int], list[dict[str, int]]],
     node_labels: Union[dict[str, dict[int, str]], None],
+    edge_weight_name: Union[str, None],
 ) -> tuple[dgl.DGLHeteroGraph, dict[int, str]]:
 
     sampler = dgl.dataloading.NeighborSampler(fanouts)
@@ -662,6 +676,7 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
         input_nodes, output_nodes, blocks = next(iter(dataloader))
 
     graph_dic = {}
+    edge_weight_dic = {}
     sampled_node_labels = {ntype: {} for ntype in graph.ntypes}
     node_labels = (
         {ntype: {} for ntype in graph.ntypes} if node_labels is None else node_labels
@@ -670,12 +685,20 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
     for src_ntype, etype, dst_ntype in graph.canonical_etypes:
         _src = []
         _dst = []
+        _edge_weight = []
         for i, block in enumerate(blocks):
             src, dst = block.edges(etype=etype)
             _src.extend(src.tolist())
             _dst.extend(dst.tolist())
 
+            if edge_weight_name is not None:
+                ew = block.edata[edge_weight_name]
+                _edge_weight.extend(ew[(src_ntype, etype, dst_ntype)].tolist())
+
         graph_dic[(src_ntype, etype, dst_ntype)] = (_src, _dst)
+
+        if edge_weight_name is not None:
+            edge_weight_dic[(src_ntype, etype, dst_ntype)] = torch.tensor(_edge_weight)
 
     for ntype in graph.ntypes:
         for i, nodes in enumerate(input_nodes[ntype].tolist()):
@@ -684,6 +707,8 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
             )
 
     sg = dgl.heterograph(graph_dic)
+    if edge_weight_name is not None:
+        sg.edata[edge_weight_name] = edge_weight_dic
 
     return sg, sampled_node_labels
 
@@ -739,7 +764,7 @@ def plot_subgraph_with_neighbors(
             ), f"fanouts must be a list for homogeneous graph. The current fanouts is {fanouts}"
 
             sg, node_labels = _extract_sub_graph_nhop_fanouts(
-                graph, target_nodes, fanouts, node_labels
+                graph, target_nodes, fanouts, node_labels, edge_weight_name
             )
 
         else:
@@ -753,7 +778,7 @@ def plot_subgraph_with_neighbors(
             ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
 
             sg, node_labels = _extract_heterogeneous_sub_graph_nhop_fanouts(
-                graph, target_nodes, fanouts, node_labels
+                graph, target_nodes, fanouts, node_labels, edge_weight_name
             )
 
     return plot_graph(
