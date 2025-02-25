@@ -434,39 +434,39 @@ name = "dglex"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "dgl" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "networkx", version = "3.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "numpy" },
     { name = "seaborn" },
-    { name = "torch", version = "2.0.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "torch", version = "2.0.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "dgl" },
     { name = "ipykernel" },
     { name = "pytest" },
     { name = "pytest-mock" },
+    { name = "torch", version = "2.0.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "torch", version = "2.0.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "dgl", url = "https://data.dgl.ai/wheels/dgl-1.0.2-cp39-cp39-manylinux1_x86_64.whl" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "networkx", specifier = ">=3.2.1" },
     { name = "numpy", specifier = ">=1.26.4,<2" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "torch", specifier = "==2.0.1", index = "https://download.pytorch.org/whl/cpu" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "dgl", url = "https://data.dgl.ai/wheels/dgl-1.0.2-cp39-cp39-manylinux1_x86_64.whl" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-mock", specifier = ">=3.14.0" },
+    { name = "torch", specifier = "==2.0.1", index = "https://download.pytorch.org/whl/cpu" },
 ]
 
 [[package]]

@@ -8,12 +8,10 @@ authors = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "dgl",
     "matplotlib>=3.9.4",
     "networkx>=3.2.1",
     "seaborn>=0.13.2",
-    "torch==2.0.1",
-    "numpy>=1.26.4,<2"
+    "numpy>=1.26.4,<2",
 ]
 
 [tool.uv.sources]
@@ -33,6 +31,8 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "dgl",
+    "torch==2.0.1",
     "ipykernel>=6.29.5",
     "pytest>=8.3.4",
     "pytest-mock>=3.14.0",
