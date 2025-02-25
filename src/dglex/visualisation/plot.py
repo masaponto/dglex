@@ -64,9 +64,12 @@ def _get_homogenous_node_labels(
 ) -> dict[int, str]:
     if node_labels is None:
         node_labels = {k: str(k) for k in ng.nodes()}
-    assert (
-        len(node_labels) == graph.number_of_nodes()
-    ), f"Not enough node labels, node_labels: {len(node_labels)}, graph: {graph.number_of_nodes()}"
+
+    if len(node_labels) != graph.number_of_nodes():
+        raise ValueError(
+            f"Not enough node labels, node_labels: {len(node_labels)}, graph: {graph.number_of_nodes()}"
+        )
+
     return node_labels
 
 
@@ -107,7 +110,12 @@ def _get_heterogenous_node_labels(
             for ndata in ng.nodes(data=True)
         }
         node_labels = _node_labels
-    assert len(node_labels) == hetero_graph.number_of_nodes(), "Not enough node labels"
+
+    if len(node_labels) != hetero_graph.number_of_nodes():
+        raise ValueError(
+            f"Not enough node labels, node_labels: {len(node_labels)}, graph: {hetero_graph.number_of_nodes()}"
+        )
+
     return node_labels
 
 
@@ -502,11 +510,11 @@ def plot_graph(
 
         else:
             for etype in reverse_etypes:
-                assert (
-                    etype in reverse_etypes.values()
-                ), """reverse_etypes must contain all edge types
-                ex) {'click': 'cilked-by', 'clicked-by':'click'}
-                """
+                if etype not in reverse_etypes.values():
+                    raise ValueError(
+                        f"etype {etype} was no found in reverse_etypes."
+                        + "reverse_etypes must contain all edge types."
+                    )
 
             etype_colors = _get_colors(
                 _count_heterogeneous_edges(graph, reverse_etypes), etype_colors
@@ -729,25 +737,32 @@ def plot_subgraph_with_neighbors(
     **kwargs,
 ) -> matplotlib.axes.Axes:
 
-    assert n_hop > 0, "n_hop must be greater than 0"
+    if n_hop <= 0:
+        raise ValueError(f"n_hop must be greater than 0. The current n_hop is {n_hop}")
 
     if fanouts is None:
 
         if graph.is_homogeneous:
-            assert (
-                type(target_nodes) == list
-            ), f"target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}"
+
+            if type(target_nodes) != list:
+                ValueError(
+                    f"target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}"
+                )
+
             sg, node_labels = _extract_subgraph_nhop(
                 graph, target_nodes, n_hop, node_labels
             )
         else:
-            assert (
-                type(target_nodes) == dict
-            ), f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
 
-            assert all(
-                isinstance(value, list) for value in target_nodes.values()
-            ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
+            if type(target_nodes) != dict:
+                ValueError(
+                    f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
+                )
+
+            if any(not isinstance(value, list) for value in target_nodes.values()):
+                ValueError(
+                    f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
+                )
 
             sg, node_labels = _extract_heterogeneous_subgraph_nhop(
                 graph, target_nodes, n_hop
@@ -756,12 +771,16 @@ def plot_subgraph_with_neighbors(
     else:
 
         if graph.is_homogeneous:
-            assert (
-                type(target_nodes) == list
-            ), f"target_nodes must be a list for homogeneous graph. the current target_nodes is {target_nodes}"
-            assert (
-                type(fanouts) == list
-            ), f"fanouts must be a list for homogeneous graph. The current fanouts is {fanouts}"
+
+            if type(target_nodes) != list:
+                ValueError(
+                    f"target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}"
+                )
+
+            if type(fanouts) != list:
+                ValueError(
+                    f"fanouts must be a list for homogeneous graph. The current fanouts is {fanouts}"
+                )
 
             sg, node_labels = _extract_sub_graph_nhop_fanouts(
                 graph, target_nodes, fanouts, node_labels, edge_weight_name
@@ -769,13 +788,15 @@ def plot_subgraph_with_neighbors(
 
         else:
 
-            assert (
-                type(target_nodes) == dict
-            ), f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
+            if type(target_nodes) != dict:
+                ValueError(
+                    f"target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}"
+                )
 
-            assert all(
-                isinstance(value, list) for value in target_nodes.values()
-            ), f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
+            if any(not isinstance(value, list) for value in target_nodes.values()):
+                ValueError(
+                    f"target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}"
+                )
 
             sg, node_labels = _extract_heterogeneous_sub_graph_nhop_fanouts(
                 graph, target_nodes, fanouts, node_labels, edge_weight_name
