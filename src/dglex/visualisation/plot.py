@@ -532,7 +532,7 @@ def _process_heterogeneous_graph(
 
 
 def plot_graph(
-    graph: dgl.DGLGraph,
+    graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph],
     title: str = "",
     node_labels: Union[dict[int, str], dict[str, dict[int, str]], None] = None,
     edge_weight_name: Union[str, None] = None,
@@ -542,6 +542,39 @@ def plot_graph(
     reverse_etypes: Union[dict[str, str], None] = None,
     **kwargs,
 ) -> matplotlib.axes.Axes:
+    """
+    Plots a DGL graph using NetworkX and Matplotlib.
+
+    This function visualizes a DGL graph, handling both homogeneous and heterogeneous graphs.
+    It can display node labels, edge weights, and different colors for node and edge types.
+    For heterogeneous graphs, it can also handle reverse edge types to represent undirected edges.
+
+    Args:
+        graph (Union[dgl.DGLGraph, dgl.DGLHeteroGraph]): The DGL graph to plot.
+        title (str, optional): The title of the plot. Defaults to "".
+        node_labels (Union[dict[int, str], dict[str, dict[int, str]], None], optional):
+            Node labels for the plot.
+            For homogeneous graphs, this is a dictionary mapping node IDs to labels.
+            For heterogeneous graphs, this is a dictionary where keys are node types and values are dictionaries mapping node IDs to labels.
+            Defaults to None.
+        edge_weight_name (Union[str, None], optional): The name of the edge data field to use for edge weights.
+            If provided, edge colors will be based on these weights, and edge labels will display the weights. Defaults to None.
+        ntype_colors (Union[list[Color], None], optional): A list of colors for node types.
+            If None, a default color palette is used. Defaults to None.
+        etype_colors (Union[list[Color], None], optional): A list of colors for edge types.
+            If None, a default color palette is used. Defaults to None.
+        figsize (tuple[int, int], optional): The figure size (width, height). Defaults to (6, 4).
+        reverse_etypes (Union[dict[str, str], None], optional): A dictionary specifying reverse edge types for heterogeneous graphs.
+            Keys are edge types, and values are the corresponding reverse edge types.
+            Used for representing bidirectional edges. Defaults to None.
+        **kwargs: Additional keyword arguments to pass to `nx.draw`.
+
+    Returns:
+        matplotlib.axes.Axes: The matplotlib axes object.
+
+    Raises:
+        ValueError: If the graph has no nodes, if edge_weight is not 1D, if `etype` was not found in reverse_etypes, if the target_nodes are not proper type for a given graph type.
+    """
 
     if graph.is_homogeneous:
         (
@@ -814,6 +847,46 @@ def plot_subgraph_with_neighbors(
     reverse_etypes: Union[dict[str, str], None] = None,
     **kwargs,
 ) -> matplotlib.axes.Axes:
+    """
+    Plots a subgraph centered around specified target nodes, including their neighbors up to a certain hop distance.
+
+    This function extracts a subgraph from the input graph, including the target nodes and their neighbors within a certain
+    number of hops, and then plots it using the `plot_graph` function. It supports both homogeneous and heterogeneous graphs.
+    You can control how the subgraph is extracted by specifying the number of hops (`n_hop`) or by using fanouts for neighbor sampling.
+
+    Args:
+        graph (dgl.DGLGraph): The input DGL graph (homogeneous or heterogeneous).
+        target_nodes (Union[list[int], dict[str, list[int]]]): The target node(s) to center the subgraph around.
+            For homogeneous graphs, this is a list of node IDs.
+            For heterogeneous graphs, this is a dictionary where keys are node types and values are lists of node IDs.
+        n_hop (int): The number of hops to include neighbors in the subgraph. Must be greater than 0.
+        fanouts (Union[list[int], list[dict[str, int]], None], optional): The fanout for each hop when sampling neighbors.
+            If None, all neighbors are included up to `n_hop`.
+            For homogeneous graphs, this is a list of integers representing the number of neighbors to sample at each hop.
+            For heterogeneous graphs, this is a list of dictionaries where keys are edge types and values are the number of neighbors to sample at each hop.
+            The length of fanouts must be the same as n_hop. Defaults to None.
+        title (str, optional): The title of the plot. Defaults to "".
+        node_labels (Union[dict[int, str], dict[str, dict[int, str]], None], optional):
+            Node labels for the plot.
+            For homogeneous graphs, this is a dictionary mapping node IDs to labels.
+            For heterogeneous graphs, this is a dictionary where keys are node types and values are dictionaries mapping node IDs to labels.
+            Defaults to None.
+        edge_weight_name (Union[str, None], optional): The name of the edge data field to use for edge weights.
+            If provided, edge colors will be based on these weights. Defaults to None.
+        ntype_colors (Union[list[Color], None], optional): A list of colors for node types. Defaults to None.
+        etype_colors (Union[list[Color], None], optional): A list of colors for edge types. Defaults to None.
+        figsize (tuple[int, int], optional): The figure size. Defaults to (6, 4).
+        reverse_etypes (Union[dict[str, str], None], optional): A dictionary specifying reverse edge types.
+            Used for representing bidirectional edges in heterogeneous graphs.
+            Keys are edge types, and values are the corresponding reverse edge types. Defaults to None.
+        **kwargs: Additional keyword arguments to pass to `nx.draw`.
+
+    Returns:
+        matplotlib.axes.Axes: The matplotlib axes object.
+
+    Raises:
+        ValueError: If `n_hop` is not greater than 0, if `fanouts` length is not equal to `n_hop`, or if the target_nodes are not proper type for a given graph type.
+    """
 
     if n_hop <= 0:
         raise ValueError(
