@@ -303,9 +303,11 @@ def _get_heterogeneous_edge_labels_reverse_etypes(
     ]
 
     edge_labels = {
-        (edata[0], edata[1]): f"{_weight:.3f}"
+        (
+            edata[0],
+            edata[1],
+        ): f"{_edge_weight[edata[2][dgl.ETYPE].item()][edata[2][dgl.EID].item()]:.3f}"
         for edata in ng.edges(data=True)
-        for _weight in _edge_weight[edata[2][dgl.ETYPE].item()]
     }
 
     return edge_labels
