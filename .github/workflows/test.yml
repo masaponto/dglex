@@ -3,8 +3,18 @@ name: Test
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '!**.md'
+      - 'uv.lock'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '!**.md'
+      - 'uv.lock'
 
 jobs:
   uv-test:
