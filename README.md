@@ -1,4 +1,5 @@
 # dglex
+![workflow](https://github.com/masaponto/dglex/actions/workflows/test.yml/badge.svg)
 A DGL Extention library.
 
 ## About
