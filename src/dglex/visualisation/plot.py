@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import networkx as nx
 import seaborn as sns
+import sys
 
 from typing import Union
 from collections import defaultdict
@@ -696,11 +697,14 @@ def _extract_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
-        num_workers=1,
+        num_workers=0 if sys.platform == "darwin" else 1,
     )
 
-    with dataloader.enable_cpu_affinity():
+    if sys.platform == "darwin":
         input_nodes, output_nodes, blocks = next(iter(dataloader))
+    else:
+        with dataloader.enable_cpu_affinity():
+            input_nodes, output_nodes, blocks = next(iter(dataloader))
 
     _src = []
     _dst = []
@@ -744,11 +748,14 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
-        num_workers=1,
+        num_workers=0 if sys.platform == "darwin" else 1,
     )
 
-    with dataloader.enable_cpu_affinity():
+    if sys.platform == "darwin":
         input_nodes, output_nodes, blocks = next(iter(dataloader))
+    else:
+        with dataloader.enable_cpu_affinity():
+            input_nodes, output_nodes, blocks = next(iter(dataloader))
 
     graph_dic = {}
     edge_weight_dic = {}
