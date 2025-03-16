@@ -697,10 +697,13 @@ def _extract_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
-        num_workers=0 if sys.platform == "darwin" else 1,
+        num_workers=(
+            0 if sys.platform == "darwin" else 1
+        ),  # for MacOS cpu affinity not works
     )
 
     if sys.platform == "darwin":
+        # for MacOS cpu affinity not works
         input_nodes, output_nodes, blocks = next(iter(dataloader))
     else:
         with dataloader.enable_cpu_affinity():
@@ -748,9 +751,12 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
         batch_size=1,
         shuffle=False,
         drop_last=False,
-        num_workers=0 if sys.platform == "darwin" else 1,
+        num_workers=(
+            0 if sys.platform == "darwin" else 1
+        ),  # for MacOS cpu affinity not works
     )
 
+    # for MacOS cpu affinity not works
     if sys.platform == "darwin":
         input_nodes, output_nodes, blocks = next(iter(dataloader))
     else:
