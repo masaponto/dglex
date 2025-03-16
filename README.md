@@ -5,6 +5,10 @@ A DGL Extention library.
 ## About
 This library is an extention of [DGL](https://www.dgl.ai/). It provides some useful functions for Graph Neural Network (GNN) projects.
 
+## Support OS
+- MacOS Apple Silicon
+- Linux x86_64
+
 ## Installation
 ```bash
 pip install torch # see https://pytorch.org/get-started/locally/
