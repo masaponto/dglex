@@ -43,12 +43,31 @@ def test_cli_view_with_options(temp_dgl_file):
     with patch("dglex.cli.plt.show"), \
          patch("dglex.cli.plot_graph") as mock_plot:
         
-        with patch("sys.argv", ["dglex", "view", temp_dgl_file, "--title", "Custom Title", "--edge-weight", "w"]):
+        with patch("sys.argv", ["dglex", "view", temp_dgl_file, 
+                                "--title", "Custom Title", 
+                                "--edge-weight", "w",
+                                "--node-palette", "Set2",
+                                "--edge-palette", "viridis"]):
             main()
             
         _, kwargs = mock_plot.call_args
         assert kwargs["title"] == "Custom Title"
         assert kwargs["edge_weight_name"] == "w"
+        assert kwargs["node_palette"] == "Set2"
+        assert kwargs["edge_palette"] == "viridis"
+
+
+def test_cli_view_invalid_palette(temp_dgl_file):
+    with patch("dglex.cli.plot_graph", side_effect=ValueError("is not a valid palette name")), \
+         patch("sys.stderr", new_callable=MagicMock) as mock_stderr:
+        
+        with patch("sys.argv", ["dglex", "view", temp_dgl_file, "--node-palette", "invalid_palette"]):
+            main()
+            
+        # Check if error message was printed to stderr
+        error_output = "".join(call.args[0] for call in mock_stderr.write.call_args_list)
+        assert "Error: is not a valid palette name" in error_output
+        assert "Hint: Please specify a valid Seaborn/Matplotlib palette name" in error_output
 
 
 def test_cli_help():
