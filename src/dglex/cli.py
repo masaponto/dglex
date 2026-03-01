@@ -1,26 +1,16 @@
 import argparse
-import dgl
-import matplotlib.pyplot as plt
 import sys
 import os
-import yaml
-import json
-from typing import Any, Dict, Optional
-from dglex.visualisation.plot import plot_graph
+from typing import Any, Dict
 
 
 def load_config(config_path: str = "dglex.yaml") -> Dict[str, Any]:
     """
     Load configuration from a YAML file.
-
-    Args:
-        config_path (str): Path to the YAML file. Defaults to "dglex.yaml".
-
-    Returns:
-        Dict[str, Any]: Configuration dictionary. Empty if not found.
     """
     if os.path.exists(config_path):
         try:
+            import yaml
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
                 if config and isinstance(config, dict) and "view" in config:
@@ -33,15 +23,8 @@ def load_config(config_path: str = "dglex.yaml") -> Dict[str, Any]:
 def merge_config(args: argparse.Namespace, config: Dict[str, Any]) -> argparse.Namespace:
     """
     Merge command line arguments with configuration file settings.
-    Command line arguments have higher priority than configuration file settings.
-
-    Args:
-        args (argparse.Namespace): Parsed command line arguments.
-        config (Dict[str, Any]): Settings from the configuration file.
-
-    Returns:
-        argparse.Namespace: Merged settings.
     """
+    import json
     args_dict = vars(args)
 
     settings_to_merge = {
@@ -68,14 +51,12 @@ def merge_config(args: argparse.Namespace, config: Dict[str, Any]) -> argparse.N
 
     for arg_name, config_key in settings_to_merge.items():
         if arg_name in args_dict and config_key in config:
-            # If user didn't change the default value, use the config file setting
             if args_dict[arg_name] == defaults.get(arg_name):
                 if config_key == "figsize" and isinstance(config[config_key], list):
                     args_dict[arg_name] = tuple(config[config_key])
                 else:
                     args_dict[arg_name] = config[config_key]
 
-    # Handle reverse_etypes parsing if it was passed as a JSON string from CLI
     if args.reverse_etypes and isinstance(args.reverse_etypes, str):
         try:
             args_dict["reverse_etypes"] = json.loads(args.reverse_etypes)
@@ -87,6 +68,14 @@ def merge_config(args: argparse.Namespace, config: Dict[str, Any]) -> argparse.N
 
 
 def view(args):
+    """
+    Execute the view sub-command.
+    """
+    # Lazy imports for heavy libraries
+    import dgl
+    import matplotlib.pyplot as plt
+    from dglex.visualisation.plot import plot_graph
+
     # Load and merge configuration
     config = load_config()
     args = merge_config(args, config)

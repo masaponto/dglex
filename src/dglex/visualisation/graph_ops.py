@@ -1,7 +1,7 @@
 import dgl
 import torch
 import sys
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Dict, List, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -22,14 +22,14 @@ class EdgeTypeInfo:
     etype_legend_name: str
 
 def _count_heterogeneous_edges(
-    graph: dgl.DGLHeteroGraph, reverse_etypes: dict[str, str]
+    graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
 ) -> int:
     """
     Count the number of unique edge identities in a heterogeneous graph, considering reverse types.
 
     Args:
         graph (dgl.DGLHeteroGraph): The DGL heterogeneous graph.
-        reverse_etypes (dict[str, str]): Mapping of edge types to their reverse counterparts.
+        reverse_etypes (Dict[str, str]): Mapping of edge types to their reverse counterparts.
 
     Returns:
         int: The number of unique edge identities.
@@ -41,8 +41,8 @@ def _count_heterogeneous_edges(
     return num_directed_edge + num_undirected_edge
 
 def _create_ueid_master(
-    hetero_graph: dgl.DGLHeteroGraph, reverse_etypes: dict[str, str]
-) -> dict[int, EdgeTypeInfo]:
+    hetero_graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
+) -> Dict[int, EdgeTypeInfo]:
     """
     Create a master mapping from original edge type IDs to EdgeTypeInfo.
 
@@ -50,10 +50,10 @@ def _create_ueid_master(
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The DGL heterogeneous graph.
-        reverse_etypes (dict[str, str]): Mapping of edge types to their reverse counterparts.
+        reverse_etypes (Dict[str, str]): Mapping of edge types to their reverse counterparts.
 
     Returns:
-        dict[int, EdgeTypeInfo]: Mapping from original edge type ID to its grouping info.
+        Dict[int, EdgeTypeInfo]: Mapping from original edge type ID to its grouping info.
     """
     ueid_master = {}
     etype_eid_master = {etype: i for i, etype in enumerate(hetero_graph.etypes)}
@@ -119,23 +119,23 @@ def _get_edge_weight(graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph], edge_weight
 
 def _extract_subgraph_nhop(
     g: dgl.DGLGraph,
-    target_nodes: list[int],
+    target_nodes: List[int],
     n_hop: int,
-    node_labels: Optional[dict[int, str]] = None,
-) -> tuple[dgl.DGLGraph, dict[int, str]]:
+    node_labels: Optional[Dict[int, str]] = None,
+) -> Tuple[dgl.DGLGraph, Dict[int, str]]:
     """
     Extract an n-hop subgraph for a homogeneous graph using full neighbor inclusion.
 
     Args:
         g (dgl.DGLGraph): The source homogeneous graph.
-        target_nodes (list[int]): Starting node IDs.
+        target_nodes (List[int]): Starting node IDs.
         n_hop (int): Number of hops to expand.
-        node_labels (Optional[dict[int, str]]): Original node labels.
+        node_labels (Optional[Dict[int, str]]): Original node labels.
 
     Returns:
-        tuple[dgl.DGLGraph, dict[int, str]]: The extracted subgraph and updated labels for the sub-nodes.
+        Tuple[dgl.DGLGraph, Dict[int, str]]: The extracted subgraph and updated labels for the sub-nodes.
     """
-    seed_nodes = target_nodes
+    seed_nodes = torch.tensor(target_nodes)
     for _i in range(n_hop):
         if _i == n_hop - 1:
             sg = dgl.in_subgraph(g, seed_nodes, relabel_nodes=True)
@@ -152,23 +152,23 @@ def _extract_subgraph_nhop(
 
 def _extract_heterogeneous_subgraph_nhop(
     hetero_graph: dgl.DGLHeteroGraph,
-    target_nodes: dict[str, list[int]],
+    target_nodes: Dict[str, List[int]],
     n_hop: int,
-    node_labels: Optional[dict[str, dict[int, str]]] = None,
-) -> tuple[dgl.DGLHeteroGraph, dict[str, dict[int, str]]]:
+    node_labels: Optional[Dict[str, Dict[int, str]]] = None,
+) -> Tuple[dgl.DGLHeteroGraph, Dict[str, Dict[int, str]]]:
     """
     Extract an n-hop subgraph for a heterogeneous graph using full neighbor inclusion.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source heterogeneous graph.
-        target_nodes (dict[str, list[int]]): Starting node IDs per type.
+        target_nodes (Dict[str, List[int]]): Starting node IDs per type.
         n_hop (int): Number of hops to expand.
-        node_labels (Optional[dict[str, dict[int, str]]]): Original node labels.
+        node_labels (Optional[Dict[str, Dict[int, str]]]): Original node labels.
 
     Returns:
-        tuple[dgl.DGLHeteroGraph, dict[str, dict[int, str]]]: The extracted subgraph and updated labels.
+        Tuple[dgl.DGLHeteroGraph, Dict[str, Dict[int, str]]]: The extracted subgraph and updated labels.
     """
-    seed_nodes = target_nodes
+    seed_nodes = {ntype: torch.tensor(nodes) for ntype, nodes in target_nodes.items()}
     for i in range(n_hop):
         if i == n_hop - 1:
             sg = dgl.in_subgraph(hetero_graph, seed_nodes, relabel_nodes=True)
@@ -181,6 +181,7 @@ def _extract_heterogeneous_subgraph_nhop(
             seed_nodes[dst_ntype].extend(dst.tolist())
             seed_nodes[src_ntype] = list(set(seed_nodes[src_ntype]))
             seed_nodes[dst_ntype] = list(set(seed_nodes[dst_ntype]))
+        seed_nodes = {ntype: torch.tensor(nodes) for ntype, nodes in seed_nodes.items()}
 
     sampled_node_labels = {}
     for ntype in hetero_graph.ntypes:
@@ -192,30 +193,30 @@ def _extract_heterogeneous_subgraph_nhop(
 
 def _extract_sub_graph_nhop_fanouts(
     graph: dgl.DGLGraph,
-    target_nodes: list[int],
-    fanouts: list[int],
-    node_labels: Optional[dict[int, str]],
+    target_nodes: List[int],
+    fanouts: List[int],
+    node_labels: Optional[Dict[int, str]],
     edge_weight_name: Optional[str],
-) -> tuple[dgl.DGLGraph, dict[int, str]]:
+) -> Tuple[dgl.DGLGraph, Dict[int, str]]:
     """
     Extract a subgraph using neighbor sampling with fanouts (homogeneous).
 
     Args:
         graph (dgl.DGLGraph): The source graph.
-        target_nodes (list[int]): Root nodes.
-        fanouts (list[int]): Number of neighbors to sample at each hop.
-        node_labels (Optional[dict[int, str]]): Original node labels.
+        target_nodes (List[int]): Root nodes.
+        fanouts (List[int]): Number of neighbors to sample at each hop.
+        node_labels (Optional[Dict[int, str]]): Original node labels.
         edge_weight_name (Optional[str]): Edge weight field to preserve.
 
     Returns:
-        tuple[dgl.DGLGraph, dict[int, str]]: Sampled subgraph and labels.
+        Tuple[dgl.DGLGraph, Dict[int, str]]: Sampled subgraph and labels.
     """
     sampler = dgl.dataloading.NeighborSampler(fanouts)
     dataloader = dgl.dataloading.DataLoader(
         graph,
-        target_nodes,
+        torch.tensor(target_nodes),
         sampler,
-        batch_size=1,
+        batch_size=len(target_nodes),
         shuffle=False,
         drop_last=False,
         num_workers=(0 if sys.platform == "darwin" else 1),
@@ -248,30 +249,31 @@ def _extract_sub_graph_nhop_fanouts(
 
 def _extract_heterogeneous_sub_graph_nhop_fanouts(
     graph: dgl.DGLHeteroGraph,
-    target_nodes: dict[str, list[int]],
-    fanouts: Union[list[int], list[dict[str, int]]],
-    node_labels: Optional[dict[str, dict[int, str]]],
+    target_nodes: Dict[str, List[int]],
+    fanouts: Union[List[int], List[Dict[str, int]]],
+    node_labels: Optional[Dict[str, Dict[int, str]]],
     edge_weight_name: Optional[str],
-) -> tuple[dgl.DGLHeteroGraph, dict[str, dict[int, str]]]:
+) -> Tuple[dgl.DGLHeteroGraph, Dict[str, Dict[int, str]]]:
     """
     Extract a subgraph using neighbor sampling with fanouts (heterogeneous).
 
     Args:
         graph (dgl.DGLHeteroGraph): The source graph.
-        target_nodes (dict[str, list[int]]): Root nodes per type.
-        fanouts (Union[list[int], list[dict[str, int]]]): Fanouts per hop.
-        node_labels (Optional[dict[str, dict[int, str]]]): Original labels.
+        target_nodes (Dict[str, List[int]]): Root nodes per type.
+        fanouts (Union[List[int], List[Dict[str, int]]]): Fanouts per hop.
+        node_labels (Optional[Dict[str, Dict[int, str]]]): Original labels.
         edge_weight_name (Optional[str]): Edge weight field to preserve.
 
     Returns:
-        tuple[dgl.DGLHeteroGraph, dict[str, dict[int, str]]]: Sampled heterogeneous subgraph and labels.
+        Tuple[dgl.DGLHeteroGraph, Dict[str, Dict[int, str]]]: Sampled heterogeneous subgraph and labels.
     """
     sampler = dgl.dataloading.NeighborSampler(fanouts)
+    seed_nodes = {ntype: torch.tensor(nodes) for ntype, nodes in target_nodes.items()}
     dataloader = dgl.dataloading.DataLoader(
         graph,
-        target_nodes,
+        seed_nodes,
         sampler,
-        batch_size=1,
+        batch_size=sum(len(v) for v in target_nodes.values()),
         shuffle=False,
         drop_last=False,
         num_workers=(0 if sys.platform == "darwin" else 1),
@@ -311,56 +313,64 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
 
 def _validate_target_nodes(
     graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph],
-    target_nodes: Union[list[int], dict[str, list[int]]],
+    target_nodes: Union[List[int], Dict[str, List[int]]],
 ) -> None:
     """
     Validate that target_nodes type matches the graph type.
 
     Args:
         graph (Union[dgl.DGLGraph, dgl.DGLHeteroGraph]): The DGL graph.
-        target_nodes (Union[list[int], dict[str, list[int]]]): Nodes to validate.
+        target_nodes (Union[List[int], Dict[str, List[int]]]): Nodes to validate.
 
     Raises:
         ValueError: If type mismatch occurs.
     """
     if graph.is_homogeneous:
         if not isinstance(target_nodes, list):
-            raise ValueError(f"The target_nodes must be a list for homogeneous graph. The current target_nodes is {target_nodes}")
+            raise ValueError(f"The target_nodes must be a list for homogeneous graph. Got {type(target_nodes)}")
     else:
         if not isinstance(target_nodes, dict):
-            raise ValueError(f"The target_nodes must be a dictionary for heterogeneous graph. The current target_nodes is {target_nodes}")
+            raise ValueError(f"The target_nodes must be a dictionary for heterogeneous graph. Got {type(target_nodes)}")
         if any(not isinstance(value, list) for value in target_nodes.values()):
-            raise ValueError(f"The target_nodes must be a dictionary of lists. The current target_nodes is {target_nodes}")
+            raise ValueError("The target_nodes must be a dictionary of lists.")
 
 def _extract_subgraph(
     graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph],
-    target_nodes: Union[list[int], dict[str, list[int]]],
+    target_nodes: Union[List[int], Dict[str, List[int]]],
     n_hop: int,
-    fanouts: Optional[Union[list[int], list[dict[str, int]]]],
-    node_labels: Optional[Union[dict[int, str], dict[str, dict[int, str]]]],
+    fanouts: Optional[Union[List[int], List[Dict[str, int]]]],
+    node_labels: Optional[Union[Dict[int, str], Dict[str, Dict[int, str]]]],
     edge_weight_name: Optional[str],
-) -> tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], dict[Any, Any]]:
+) -> Tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], Dict[Any, Any]]:
     """
     Generic subgraph extraction dispatcher.
 
     Args:
         graph (Union[dgl.DGLGraph, dgl.DGLHeteroGraph]): The DGL graph.
-        target_nodes (Union[list[int], dict[str, list[int]]]): Seed nodes.
+        target_nodes (Union[List[int], Dict[str, List[int]]]): Seed nodes.
         n_hop (int): Number of hops.
-        fanouts (Optional[Union[list[int], list[dict[str, int]]]]): Sampling fanouts.
-        node_labels (Optional[Union[dict[int, str], dict[str, dict[int, str]]]]): Original labels.
+        fanouts (Optional[Union[List[int], List[Dict[str, int]]]]): Sampling fanouts.
+        node_labels (Optional[Union[Dict[int, str], Dict[str, Dict[int, str]]]]): Original labels.
         edge_weight_name (Optional[str]): Edge weight field.
 
     Returns:
-        tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], dict[Any, Any]]: Extracted subgraph and its labels.
+        Tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], Dict[Any, Any]]: Extracted subgraph and its labels.
     """
     if graph.is_homogeneous:
+        # Cast for type safety
+        homo_target_nodes = target_nodes # type: ignore
+        homo_node_labels = node_labels # type: ignore
+        homo_fanouts = fanouts # type: ignore
         if fanouts is None:
-            return _extract_subgraph_nhop(graph, target_nodes, n_hop, node_labels)
+            return _extract_subgraph_nhop(graph, homo_target_nodes, n_hop, homo_node_labels)
         else:
-            return _extract_sub_graph_nhop_fanouts(graph, target_nodes, fanouts, node_labels, edge_weight_name)
+            return _extract_sub_graph_nhop_fanouts(graph, homo_target_nodes, homo_fanouts, homo_node_labels, edge_weight_name)
     else:
+        # Cast for type safety
+        hetero_target_nodes = target_nodes # type: ignore
+        hetero_node_labels = node_labels # type: ignore
+        hetero_fanouts = fanouts # type: ignore
         if fanouts is None:
-            return _extract_heterogeneous_subgraph_nhop(graph, target_nodes, n_hop, node_labels)
+            return _extract_heterogeneous_subgraph_nhop(graph, hetero_target_nodes, n_hop, hetero_node_labels)
         else:
-            return _extract_heterogeneous_sub_graph_nhop_fanouts(graph, target_nodes, fanouts, node_labels, edge_weight_name)
+            return _extract_heterogeneous_sub_graph_nhop_fanouts(graph, hetero_target_nodes, hetero_fanouts, hetero_node_labels, edge_weight_name)

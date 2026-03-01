@@ -17,8 +17,8 @@ def temp_dgl_file(tmp_path):
 
 
 def test_cli_view_basic(temp_dgl_file):
-    with patch("dglex.cli.plt.show"), \
-         patch("dglex.cli.plot_graph") as mock_plot:
+    with patch("matplotlib.pyplot.show"), \
+         patch("dglex.visualisation.plot.plot_graph") as mock_plot:
         
         # Simulate command line arguments: dglex view path/to/graph.bin
         with patch("sys.argv", ["dglex", "view", temp_dgl_file]):
@@ -31,8 +31,8 @@ def test_cli_view_basic(temp_dgl_file):
 
 def test_cli_view_save_output(temp_dgl_file, tmp_path):
     output_png = os.path.join(tmp_path, "output.png")
-    with patch("dglex.cli.plt.savefig") as mock_savefig, \
-         patch("dglex.cli.plot_graph"):
+    with patch("matplotlib.pyplot.savefig") as mock_savefig, \
+         patch("dglex.visualisation.plot.plot_graph"):
         
         with patch("sys.argv", ["dglex", "view", temp_dgl_file, "--output", output_png]):
             main()
@@ -41,8 +41,8 @@ def test_cli_view_save_output(temp_dgl_file, tmp_path):
 
 
 def test_cli_view_with_options(temp_dgl_file):
-    with patch("dglex.cli.plt.show"), \
-         patch("dglex.cli.plot_graph") as mock_plot:
+    with patch("matplotlib.pyplot.show"), \
+         patch("dglex.visualisation.plot.plot_graph") as mock_plot:
         
         reverse_etypes_json = '{"click": "clicked-by"}'
         with patch("sys.argv", ["dglex", "view", temp_dgl_file, 
@@ -64,7 +64,7 @@ def test_cli_view_with_options(temp_dgl_file):
 
 
 def test_cli_view_invalid_palette(temp_dgl_file):
-    with patch("dglex.cli.plot_graph", side_effect=ValueError("is not a valid palette name")), \
+    with patch("dglex.visualisation.plot.plot_graph", side_effect=ValueError("is not a valid palette name")), \
          patch("sys.stderr", new_callable=MagicMock) as mock_stderr:
         
         with patch("sys.argv", ["dglex", "view", temp_dgl_file, "--node-palette", "invalid_palette"]):
@@ -87,8 +87,8 @@ def test_cli_view_with_config_file(temp_dgl_file):
         yaml.dump(config_data, f)
         
     try:
-        with patch("dglex.cli.plt.show"), \
-             patch("dglex.cli.plot_graph") as mock_plot:
+        with patch("matplotlib.pyplot.show"), \
+             patch("dglex.visualisation.plot.plot_graph") as mock_plot:
             
             with patch("sys.argv", ["dglex", "view", temp_dgl_file]):
                 main()

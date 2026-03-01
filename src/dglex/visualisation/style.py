@@ -3,16 +3,17 @@ import matplotlib.colors as mcolors
 import seaborn as sns
 import dgl
 import networkx as nx
-from typing import Union, Any, Optional
+import torch
+from typing import Union, Optional, Dict, Tuple, List, Any
 
 # Type aliases
-Color = Union[str, tuple[float, ...]]
+Color = Union[str, Tuple[float, ...]]
 Legend = plt.Line2D
 
 
 def _get_colors(
-    n: int, colors: Optional[list[Color]], palette_name: str = "tab10"
-) -> list[Color]:
+    n: int, colors: Optional[List[Color]], palette_name: str = "tab10"
+) -> List[Color]:
     """
     Generate a list of colors for node or edge types.
 
@@ -21,11 +22,11 @@ def _get_colors(
 
     Args:
         n (int): Number of colors to generate.
-        colors (Optional[list[Color]]): Pre-defined list of colors.
+        colors (Optional[List[Color]]): Pre-defined list of colors.
         palette_name (str): Name of the Seaborn palette to use if `colors` is None. Defaults to "tab10".
 
     Returns:
-        list[Color]: A list of `n` colors.
+        List[Color]: A list of `n` colors.
     """
     if colors is None:
         colors = sns.color_palette(palette=palette_name, n_colors=n)
@@ -50,17 +51,17 @@ def _get_colormap_from_base_color(base_color: Color) -> mcolors.LinearSegmentedC
 
 
 def _get_colors_from_weights(
-    base_color: Color, weight_list: list[float]
-) -> list[Color]:
+    base_color: Color, weight_list: List[float]
+) -> List[Color]:
     """
     Generate colors for edges based on their weights using a colormap derived from a base color.
 
     Args:
         base_color (Color): The base color for the edge type.
-        weight_list (list[float]): A list of edge weights to map to colors.
+        weight_list (List[float]): A list of edge weights to map to colors.
 
     Returns:
-        list[Color]: A list of colors corresponding to the input weights.
+        List[Color]: A list of colors corresponding to the input weights.
     """
     if len(weight_list) == 0:
         return []
@@ -81,16 +82,16 @@ def _get_colors_from_weights(
 
 
 def _get_homogeneous_node_colors_and_legend(
-    ntype_colors: list[Color],
-) -> tuple[list[Color], list[Legend]]:
+    ntype_colors: List[Color],
+) -> Tuple[List[Color], List[Legend]]:
     """
     Generate node colors and a legend for a homogeneous graph.
 
     Args:
-        ntype_colors (list[Color]): A list containing the color for the single node type.
+        ntype_colors (List[Color]): A list containing the color for the single node type.
 
     Returns:
-        tuple[list[Color], list[Legend]]: A tuple containing:
+        Tuple[List[Color], List[Legend]]: A tuple containing:
             - A list of colors for each node (all the same for homogeneous).
             - A list containing a single legend element for nodes.
     """
@@ -110,18 +111,18 @@ def _get_homogeneous_node_colors_and_legend(
 
 
 def _get_heterogenous_node_colors_and_legend(
-    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: list[Color]
-) -> tuple[list[Color], list[Legend]]:
+    hetero_graph: dgl.DGLHeteroGraph, ng: nx.Graph, ntype_colors: List[Color]
+) -> Tuple[List[Color], List[Legend]]:
     """
     Generate node colors and a legend for a heterogeneous graph.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph (homogeneous representation).
-        ntype_colors (list[Color]): A list of colors corresponding to each node type in `hetero_graph.ntypes`.
+        ntype_colors (List[Color]): A list of colors corresponding to each node type in `hetero_graph.ntypes`.
 
     Returns:
-        tuple[list[Color], list[Legend]]: A tuple containing:
+        Tuple[List[Color], List[Legend]]: A tuple containing:
             - A list of colors for each node in the NetworkX graph.
             - A list of legend elements, one for each node type.
     """
@@ -144,17 +145,17 @@ def _get_heterogenous_node_colors_and_legend(
 
 
 def _get_homogeneous_edge_colors_and_legend(
-    etype_colors: list[Color], edge_weight: Any = None
-) -> tuple[list[Color], list[Legend]]:
+    etype_colors: List[Color], edge_weight: Optional[torch.Tensor] = None
+) -> Tuple[List[Color], List[Legend]]:
     """
     Generate edge colors and a legend for a homogeneous graph.
 
     Args:
-        etype_colors (list[Color]): A list containing the color for the single edge type.
-        edge_weight (Any, optional): Edge weights for color mapping. Defaults to None.
+        etype_colors (List[Color]): A list containing the color for the single edge type.
+        edge_weight (Optional[torch.Tensor], optional): Edge weights for color mapping. Defaults to None.
 
     Returns:
-        tuple[list[Color], list[Legend]]: A tuple containing:
+        Tuple[List[Color], List[Legend]]: A tuple containing:
             - A list of colors for each edge.
             - A list containing a single legend element for edges.
     """
@@ -180,20 +181,20 @@ def _get_homogeneous_edge_colors_and_legend(
 def _get_heterogeneous_edge_colors_and_legend(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    etype_colors: list[Color],
-    edge_weight: Any = None,
-) -> tuple[list[Color], list[Legend]]:
+    etype_colors: List[Color],
+    edge_weight: Optional[Dict[Tuple[str, str, str], torch.Tensor]] = None,
+) -> Tuple[List[Color], List[Legend]]:
     """
     Generate edge colors and a legend for a heterogeneous graph (without reverse edge types).
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
-        etype_colors (list[Color]): Colors for each edge type.
-        edge_weight (Any, optional): Edge weights per canonical edge type. Defaults to None.
+        etype_colors (List[Color]): Colors for each edge type.
+        edge_weight (Optional[Dict[Tuple[str, str, str], torch.Tensor]], optional): Edge weights per canonical edge type. Defaults to None.
 
     Returns:
-        tuple[list[Color], list[Legend]]: A tuple containing colors for each edge and legend elements for each edge type.
+        Tuple[List[Color], List[Legend]]: A tuple containing colors for each edge and legend elements for each edge type.
     """
     if edge_weight is None:
         edge_colors = [
@@ -232,22 +233,22 @@ def _get_heterogeneous_edge_colors_and_legend(
 def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    etype_colors: list[Color],
-    ueid_master: dict[int, Any],
-    edge_weight: Any = None,
-) -> tuple[list[Color], list[Legend]]:
+    etype_colors: List[Color],
+    ueid_master: Dict[int, Any],
+    edge_weight: Optional[Dict[Tuple[str, str, str], torch.Tensor]] = None,
+) -> Tuple[List[Color], List[Legend]]:
     """
     Generate edge colors and a legend for a heterogeneous graph, grouping reverse edge types.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
-        etype_colors (list[Color]): Colors for each unique edge identity (ueid).
-        ueid_master (dict[int, Any]): Mapping from etype ID to EdgeTypeInfo (containing ueid).
-        edge_weight (Any, optional): Edge weights per canonical edge type. Defaults to None.
+        etype_colors (List[Color]): Colors for each unique edge identity (ueid).
+        ueid_master (Dict[int, Any]): Mapping from etype ID to EdgeTypeInfo (containing ueid).
+        edge_weight (Optional[Dict[Tuple[str, str, str], torch.Tensor]], optional): Edge weights per canonical edge type. Defaults to None.
 
     Returns:
-        tuple[list[Color], list[Legend]]: A tuple containing colors for each edge and legend elements for grouped edge types.
+        Tuple[List[Color], List[Legend]]: A tuple containing colors for each edge and legend elements for grouped edge types.
     """
     if edge_weight is None:
         edge_colors = [
@@ -292,18 +293,18 @@ def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
 
 
 def _get_homogenous_node_labels(
-    graph: dgl.DGLGraph, ng: nx.Graph, node_labels: Optional[dict[int, str]]
-) -> dict[int, str]:
+    graph: dgl.DGLGraph, ng: nx.Graph, node_labels: Optional[Dict[int, str]]
+) -> Dict[int, str]:
     """
     Generate node labels for a homogeneous graph.
 
     Args:
         graph (dgl.DGLGraph): The source DGL graph.
         ng (nx.Graph): The converted NetworkX graph.
-        node_labels (Optional[dict[int, str]]): User-provided labels. If None, node IDs are used.
+        node_labels (Optional[Dict[int, str]]): User-provided labels. If None, node IDs are used.
 
     Returns:
-        dict[int, str]: Mapping from node ID to label string.
+        Dict[int, str]: Mapping from node ID to label string.
     """
     if node_labels is None:
         node_labels = {k: str(k) for k in ng.nodes()}
@@ -318,18 +319,18 @@ def _get_homogenous_node_labels(
 def _get_heterogenous_node_labels(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    node_labels: Optional[dict[str, dict[int, str]]],
-) -> dict[int, str]:
+    node_labels: Optional[Dict[str, Dict[int, str]]],
+) -> Dict[int, str]:
     """
     Generate node labels for a heterogeneous graph.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
-        node_labels (Optional[dict[str, dict[int, str]]]): User-provided labels per node type.
+        node_labels (Optional[Dict[str, Dict[int, str]]]): User-provided labels per node type.
 
     Returns:
-        dict[int, str]: Mapping from NetworkX node ID to label string.
+        Dict[int, str]: Mapping from NetworkX node ID to label string.
     """
     ntypes = hetero_graph.ntypes
 
@@ -354,17 +355,17 @@ def _get_heterogenous_node_labels(
 
 
 def _get_homogeneous_edge_labels(
-    graph: dgl.DGLGraph, edge_weight: Any
-) -> Optional[dict[tuple[int, int], str]]:
+    graph: dgl.DGLGraph, edge_weight: Optional[torch.Tensor]
+) -> Optional[Dict[Tuple[int, int], str]]:
     """
     Generate edge labels (weights) for a homogeneous graph.
 
     Args:
         graph (dgl.DGLGraph): The source DGL graph.
-        edge_weight (Any): Edge weight tensor.
+        edge_weight (Optional[torch.Tensor]): Edge weight tensor.
 
     Returns:
-        Optional[dict[tuple[int, int], str]]: Mapping from edge tuple to weight string, or None if no weight.
+        Optional[Dict[Tuple[int, int], str]]: Mapping from edge tuple to weight string, or None if no weight.
     """
     if edge_weight is None:
         return None
@@ -381,18 +382,18 @@ def _get_homogeneous_edge_labels(
 def _get_heterogeneous_edge_labels(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    edge_weight: Any,
-) -> Optional[dict[tuple[int, int], str]]:
+    edge_weight: Optional[Dict[Tuple[str, str, str], torch.Tensor]],
+) -> Optional[Dict[Tuple[int, int], str]]:
     """
     Generate edge labels (weights) for a heterogeneous graph.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
-        edge_weight (Any): Dictionary of edge weight tensors per canonical edge type.
+        edge_weight (Optional[Dict[Tuple[str, str, str], torch.Tensor]]): Dictionary of edge weight tensors per canonical edge type.
 
     Returns:
-        Optional[dict[tuple[int, int], str]]: Mapping from edge tuple to weight string.
+        Optional[Dict[Tuple[int, int], str]]: Mapping from edge tuple to weight string.
     """
     if edge_weight is None:
         return None
@@ -412,18 +413,18 @@ def _get_heterogeneous_edge_labels(
 def _get_heterogeneous_edge_labels_reverse_etypes(
     hetero_graph: dgl.DGLHeteroGraph,
     ng: nx.Graph,
-    edge_weight: Any,
-) -> Optional[dict[tuple[int, int], str]]:
+    edge_weight: Optional[Dict[Tuple[str, str, str], torch.Tensor]],
+) -> Optional[Dict[Tuple[int, int], str]]:
     """
     Generate edge labels (weights) for a heterogeneous graph with reverse edge types.
 
     Args:
         hetero_graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
-        edge_weight (Any): Dictionary of edge weight tensors per canonical edge type.
+        edge_weight (Optional[Dict[Tuple[str, str, str], torch.Tensor]]): Dictionary of edge weight tensors per canonical edge type.
 
     Returns:
-        Optional[dict[tuple[int, int], str]]: Mapping from edge tuple to weight string.
+        Optional[Dict[Tuple[int, int], str]]: Mapping from edge tuple to weight string.
     """
     if edge_weight is None:
         return None
