@@ -30,11 +30,29 @@ dglex view my_graph.bin
 # Preview with specific index, title, and edge weight
 dglex view my_graph.bin --index 1 --title "Sample Hetero Graph" --edge-weight "weights"
 
+# Use reverse edge types to represent undirected edges (JSON string)
+dglex view my_graph.bin --reverse-etypes '{"click": "clicked-by", "follow": "followed-by"}'
+
 # Customize color palettes
 dglex view my_graph.bin --node-palette "Set2" --edge-palette "viridis"
 
 # Save the preview as an image
 dglex view my_graph.bin --output graph_preview.png
+```
+
+### Configuration File (`dglex.yaml`)
+You can also use a `dglex.yaml` file in your current directory to set default options for the `view` command. Command line arguments will override these settings.
+
+Example `dglex.yaml`:
+```yaml
+view:
+  node_palette: "magma"
+  edge_palette: "viridis"
+  figsize: [10, 8]
+  edge_weight: "weight"
+  reverse_etypes:
+    click: "clicked-by"
+    follow: "followed-by"
 ```
 
 ## LICENSE

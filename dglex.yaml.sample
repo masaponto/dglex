@@ -1,0 +1,21 @@
+# dglex configuration file
+# This file allows you to set default options for the 'dglex view' command.
+# Command line arguments will override these settings.
+
+view:
+  # Color palette for nodes (e.g., tab10, Set2, viridis, magma)
+  node_palette: "tab10"
+  
+  # Color palette for edges (e.g., tab10, Set2, viridis, magma)
+  edge_palette: "tab10"
+  
+  # Default figure size [width, height]
+  figsize: [8, 6]
+  
+  # Default edge weight data field name
+  # edge_weight: "weight"
+  
+  # Default reverse edge types for heterogeneous graphs
+  # reverse_etypes:
+  #   click: "clicked-by"
+  #   follow: "followed-by"
