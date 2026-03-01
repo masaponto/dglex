@@ -55,5 +55,25 @@ view:
     follow: "followed-by"
 ```
 
+### Large Graph Handling
+When a graph exceeds certain limits (default: 500 nodes or 2,000 edges), `dglex` will warn you and offer sampling options to prevent system hangs.
+
+#### Sampling Strategies
+1. **Random Sample (Default)**: Picks `sample_size` nodes randomly. This is the fastest method and works even for extremely large graphs.
+2. **Hub Sample**: Picks `sample_size` nodes with the highest total degrees. This provides a better view of the graph's core structure but may take a moment to calculate degrees on large graphs.
+
+Both strategies use `plot_subgraph_with_neighbors` with physical edge limits (`fanouts`) to ensure the resulting preview is always safe to render.
+
+#### Customizing Limits
+You can customize these behaviors in your `dglex.yaml`:
+```yaml
+view:
+  limits:
+    max_nodes: 1000      # Show warning if nodes > 1000
+    max_edges: 5000      # Show warning if edges > 5000
+    sample_size: 10      # Pick 10 seed nodes for sampling
+    sample_fanouts: [20, 10] # 2-hop sampling: 20 edges at 1st hop, 10 at 2nd
+```
+
 ## LICENSE
 MIT

@@ -64,17 +64,31 @@ def merge_config(args: argparse.Namespace, config: Dict[str, Any]) -> argparse.N
             print(f"Error parsing --reverse-etypes: {e}", file=sys.stderr)
             args_dict["reverse_etypes"] = None
 
+    # Merge limits
+    default_limits = {
+        "max_nodes": 500,
+        "max_edges": 2000,
+        "sample_size": 5,
+        "sample_fanouts": [10],
+    }
+    
+    args_dict["limits"] = default_limits.copy()
+    if "limits" in config and isinstance(config["limits"], dict):
+        for key, value in config["limits"].items():
+            if key in default_limits:
+                args_dict["limits"][key] = value
+
     return args
 
 
 def view(args):
     """
-    Execute the view sub-command.
+    Execute the view sub-command with safety checks for large graphs.
     """
-    # Lazy imports for heavy libraries
     import dgl
     import matplotlib.pyplot as plt
-    from dglex.visualisation.plot import plot_graph
+    from dglex.visualisation.plot import plot_graph, plot_subgraph_with_neighbors
+    from dglex.visualisation.graph_ops import get_random_nodes, get_top_k_degree_nodes
 
     # Load and merge configuration
     config = load_config()
@@ -96,34 +110,97 @@ def view(args):
 
     g = graphs[args.index]
     
-    # Ensure figsize is a tuple if provided
-    figsize_arg = args.figsize
-    if figsize_arg is not None and isinstance(figsize_arg, list):
-        figsize_arg = tuple(figsize_arg)
+    # Check graph size
+    num_nodes = g.num_nodes() if g.is_homogeneous else sum(g.num_nodes(ntype) for ntype in g.ntypes)
+    num_edges = g.num_edges() if g.is_homogeneous else sum(g.num_edges(etype) for etype in g.canonical_etypes)
     
-    if figsize_arg is None:
-        figsize_arg = (6, 4)
+    limits = args.limits
+    is_large = num_nodes > limits["max_nodes"] or num_edges > limits["max_edges"]
     
+    action = "continue"
+    if is_large and not args.force:
+        print(f"\nWarning: Large graph detected!")
+        print(f"- Nodes: {num_nodes:,}")
+        print(f"- Edges: {num_edges:,}")
+        print(f"\nRendering this graph may be slow or cause memory issues.")
+        
+        if sys.stdin.isatty() and not args.output:
+            print("\nHow would you like to proceed?")
+            print("[1] Continue: Render the full graph anyway")
+            print("[2] Random Sample (Default): Pick representative nodes randomly")
+            print("[3] Hub Sample: Pick nodes with highest degrees")
+            print("[4] Abort: Cancel the operation")
+            
+            choice = input("\nPlease select [1/2/3/4] (default 2): ").strip()
+            if choice == "1":
+                action = "continue"
+            elif choice == "3":
+                action = "hub"
+            elif choice == "4":
+                print("Operation aborted.")
+                return
+            else:
+                action = "random"
+        else:
+            # Non-interactive or output specified: safety first
+            print("Action: Automatic random sampling applied for safety. Use --force to override.", file=sys.stderr)
+            action = "random"
+
+    # Execution phase
     try:
-        ax = plot_graph(
-            g,
-            title=args.title or f"Graph {args.index} from {args.path}",
-            edge_weight_name=args.edge_weight,
-            node_palette=args.node_palette,
-            edge_palette=args.edge_palette,
-            figsize=figsize_arg,
-            reverse_etypes=args.reverse_etypes,
-        )
+        if action == "continue":
+            # Ensure figsize is a tuple if provided
+            figsize_arg = args.figsize
+            if figsize_arg is not None and isinstance(figsize_arg, list):
+                figsize_arg = tuple(figsize_arg)
+            if figsize_arg is None:
+                figsize_arg = (6, 4)
+
+            ax = plot_graph(
+                g,
+                title=args.title or f"Graph {args.index} from {args.path}",
+                edge_weight_name=args.edge_weight,
+                node_palette=args.node_palette,
+                edge_palette=args.edge_palette,
+                figsize=figsize_arg,
+                reverse_etypes=args.reverse_etypes,
+            )
+        else:
+            # Sampling path
+            sample_size = limits["sample_size"]
+            sample_fanouts = limits["sample_fanouts"]
+            
+            if action == "random":
+                target_nodes = get_random_nodes(g, k=sample_size)
+                mode_str = "Randomly selected"
+            else: # hub
+                target_nodes = get_top_k_degree_nodes(g, k=sample_size)
+                mode_str = "Hub-based"
+            
+            print(f"Sampling {sample_size} nodes ({action} mode) with fanouts {sample_fanouts}...")
+            
+            ax = plot_subgraph_with_neighbors(
+                g,
+                target_nodes=target_nodes,
+                n_hop=len(sample_fanouts),
+                fanouts=sample_fanouts,
+                title=args.title or f"{mode_str} Preview of Graph {args.index}",
+                edge_weight_name=args.edge_weight,
+                node_palette=args.node_palette,
+                edge_palette=args.edge_palette,
+                reverse_etypes=args.reverse_etypes,
+            )
+
+        if args.output:
+            plt.savefig(args.output)
+            print(f"Saved preview to {args.output}")
+        else:
+            plt.show()
+            
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
-        print("Hint: Please specify a valid Seaborn/Matplotlib palette name (e.g., 'viridis', 'magma', 'Set2').", file=sys.stderr)
+        print("Hint: Please specify a valid Seaborn/Matplotlib palette name.", file=sys.stderr)
         return
-
-    if args.output:
-        plt.savefig(args.output)
-        print(f"Saved preview to {args.output}")
-    else:
-        plt.show()
 
 
 def main():
@@ -140,7 +217,8 @@ def main():
     view_parser.add_argument("--edge-palette", type=str, default="tab10", help="Seaborn color palette for edges (default: tab10)")
     view_parser.add_argument("--output", "-o", type=str, help="Path to save the plot image (optional)")
     view_parser.add_argument("--figsize", type=int, nargs=2, help="Figure size as width height (optional)")
-    view_parser.add_argument("--reverse-etypes", type=str, help="Reverse edge types as a JSON string (e.g., '{\"click\": \"clicked-by\"}')")
+    view_parser.add_argument("--reverse-etypes", type=str, help="Reverse edge types as a JSON string")
+    view_parser.add_argument("--force", "-f", action="store_true", help="Force rendering of large graphs without sampling")
 
     args = parser.parse_args()
 

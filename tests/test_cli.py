@@ -20,7 +20,6 @@ def test_cli_view_basic(temp_dgl_file):
     with patch("matplotlib.pyplot.show"), \
          patch("dglex.visualisation.plot.plot_graph") as mock_plot:
         
-        # Simulate command line arguments: dglex view path/to/graph.bin
         with patch("sys.argv", ["dglex", "view", temp_dgl_file]):
             main()
             
@@ -72,6 +71,29 @@ def test_cli_view_invalid_palette(temp_dgl_file):
             
         error_output = "".join(call.args[0] for call in mock_stderr.write.call_args_list)
         assert "Error: is not a valid palette name" in error_output
+
+
+def test_cli_view_large_graph_sampling(tmp_path):
+    # Create a "large" graph (over 500 nodes)
+    src = torch.arange(600)
+    dst = (src + 1) % 600
+    g = dgl.graph((src, dst))
+    file_path = os.path.join(tmp_path, "large_graph.bin")
+    dgl.save_graphs(file_path, [g])
+    
+    with patch("matplotlib.pyplot.show"), \
+         patch("dglex.visualisation.plot.plot_subgraph_with_neighbors") as mock_sub_plot, \
+         patch("builtins.input", return_value="2"), \
+         patch("sys.stdin.isatty", return_value=True):
+        
+        with patch("sys.argv", ["dglex", "view", file_path]):
+            main()
+            
+        # Should call plot_subgraph_with_neighbors instead of plot_graph
+        mock_sub_plot.assert_called_once()
+        _, kwargs = mock_sub_plot.call_args
+        assert "fanouts" in kwargs
+        assert kwargs["n_hop"] == len(kwargs["fanouts"])
 
 
 def test_cli_view_with_config_file(temp_dgl_file):

@@ -19,3 +19,13 @@ view:
   # reverse_etypes:
   #   click: "clicked-by"
   #   follow: "followed-by"
+
+  # Safety limits for large graphs
+  limits:
+    # Thresholds to trigger a warning
+    max_nodes: 500
+    max_edges: 2000
+    
+    # Sampling parameters
+    sample_size: 5
+    sample_fanouts: [10]

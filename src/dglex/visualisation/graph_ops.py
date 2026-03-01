@@ -1,6 +1,7 @@
 import dgl
 import torch
 import sys
+import random
 from typing import Union, Any, Optional, Dict, List, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
@@ -20,6 +21,79 @@ class EdgeTypeInfo:
     eid: int
     ueid: int
     etype_legend_name: str
+
+def get_random_nodes(
+    graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph], k: int
+) -> Union[List[int], Dict[str, List[int]]]:
+    """
+    Select k random nodes from the graph.
+
+    Args:
+        graph (Union[dgl.DGLGraph, dgl.DGLHeteroGraph]): The DGL graph.
+        k (int): Number of nodes to select.
+
+    Returns:
+        Union[List[int], Dict[str, List[int]]]: Selected node IDs.
+    """
+    if graph.is_homogeneous:
+        num_nodes = graph.num_nodes()
+        if num_nodes <= k:
+            return list(range(num_nodes))
+        return torch.randperm(num_nodes)[:k].tolist()
+    else:
+        # Collect all possible (ntype, nid) pairs
+        all_nodes = []
+        for ntype in graph.ntypes:
+            n_count = graph.num_nodes(ntype)
+            for nid in range(n_count):
+                all_nodes.append((ntype, nid))
+        
+        selected = random.sample(all_nodes, min(k, len(all_nodes)))
+        
+        result = defaultdict(list)
+        for ntype, nid in selected:
+            result[ntype].append(nid)
+        return dict(result)
+
+def get_top_k_degree_nodes(
+    graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph], k: int
+) -> Union[List[int], Dict[str, List[int]]]:
+    """
+    Select k nodes with the highest total degree (in + out).
+
+    Args:
+        graph (Union[dgl.DGLGraph, dgl.DGLHeteroGraph]): The DGL graph.
+        k (int): Number of nodes to select.
+
+    Returns:
+        Union[List[int], Dict[str, List[int]]]: Selected node IDs.
+    """
+    if graph.is_homogeneous:
+        degrees = graph.in_degrees() + graph.out_degrees()
+        if len(degrees) == 0:
+            return []
+        _, indices = torch.topk(degrees, min(k, len(degrees)))
+        return indices.tolist()
+    else:
+        total_degrees = {ntype: torch.zeros(graph.num_nodes(ntype)) for ntype in graph.ntypes}
+        
+        for srctype, etype, dsttype in graph.canonical_etypes:
+            total_degrees[srctype] += graph.out_degrees(etype=etype)
+            total_degrees[dsttype] += graph.in_degrees(etype=etype)
+            
+        all_nodes_with_degree = []
+        for ntype in graph.ntypes:
+            for nid, degree in enumerate(total_degrees[ntype].tolist()):
+                all_nodes_with_degree.append((ntype, nid, degree))
+        
+        # Sort by degree descending
+        all_nodes_with_degree.sort(key=lambda x: x[2], reverse=True)
+        selected = all_nodes_with_degree[:min(k, len(all_nodes_with_degree))]
+        
+        result = defaultdict(list)
+        for ntype, nid, _ in selected:
+            result[ntype].append(nid)
+        return dict(result)
 
 def _count_heterogeneous_edges(
     graph: dgl.DGLHeteroGraph, reverse_etypes: Dict[str, str]
