@@ -20,5 +20,19 @@ pip install git+https://github.com/masaponto/dglex.git
 ### Graph Visualization
  See examples/visualization.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/visualization.ipynb)
 
+### CLI Preview Tool
+You can preview a DGL graph file (`.bin`) from the command line.
+
+```bash
+# Preview the first graph in the file
+dglex view my_graph.bin
+
+# Preview with specific index, title, and edge weight
+dglex view my_graph.bin --index 1 --title "Sample Hetero Graph" --edge-weight "weights"
+
+# Save the preview as an image
+dglex view my_graph.bin --output graph_preview.png
+```
+
 ## LICENSE
 MIT
