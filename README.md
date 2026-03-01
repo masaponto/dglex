@@ -30,6 +30,9 @@ dglex view my_graph.bin
 # Preview with specific index, title, and edge weight
 dglex view my_graph.bin --index 1 --title "Sample Hetero Graph" --edge-weight "weights"
 
+# Customize color palettes
+dglex view my_graph.bin --node-palette "Set2" --edge-palette "viridis"
+
 # Save the preview as an image
 dglex view my_graph.bin --output graph_preview.png
 ```

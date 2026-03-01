@@ -446,7 +446,7 @@ def _get_edge_weight(graph, edge_weight_name):
 
 
 def _process_homogeneous_graph(
-    graph, node_labels, ntype_colors, etype_colors, edge_weight_name
+    graph, node_labels, ntype_colors, etype_colors, edge_weight_name, node_palette="tab10", edge_palette="tab10"
 ):
     if graph.num_nodes() == 0:
         raise ValueError(f"graph must have nodes, {graph}")
@@ -455,8 +455,8 @@ def _process_homogeneous_graph(
     edge_attrs = [dgl.EID] if dgl.EID in graph.edata else []
     ng = dgl.to_networkx(graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
     node_labels = _get_homogenous_node_labels(graph, ng, node_labels)
-    ntype_colors = _get_colors(1, ntype_colors)
-    etype_colors = _get_colors(1, etype_colors)
+    ntype_colors = _get_colors(1, ntype_colors, palette_name=node_palette)
+    etype_colors = _get_colors(1, etype_colors, palette_name=edge_palette)
     edge_weight = _get_edge_weight(graph, edge_weight_name)
     _validate_edge_weight(
         edge_weight, edge_weight.shape if edge_weight is not None else None
@@ -478,20 +478,20 @@ def _process_homogeneous_graph(
 
 
 def _process_heterogeneous_graph(
-    graph, node_labels, ntype_colors, etype_colors, edge_weight_name, reverse_etypes
+    graph, node_labels, ntype_colors, etype_colors, edge_weight_name, reverse_etypes, node_palette="tab10", edge_palette="tab10"
 ):
     homo_graph = dgl.to_homogeneous(graph, store_type=True)
     node_attrs = [dgl.NID, dgl.NTYPE]
     edge_attrs = [dgl.EID, dgl.ETYPE]
     ng = dgl.to_networkx(homo_graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
     node_labels = _get_heterogenous_node_labels(graph, ng, node_labels)
-    ntype_colors = _get_colors(len(graph.ntypes), ntype_colors)
+    ntype_colors = _get_colors(len(graph.ntypes), ntype_colors, palette_name=node_palette)
     node_colors, node_legend = _get_heterogenous_node_colors_and_legend(
         graph, ng, ntype_colors
     )
 
     if reverse_etypes is None:
-        etype_colors = _get_colors(len(graph.etypes), etype_colors)
+        etype_colors = _get_colors(len(graph.etypes), etype_colors, palette_name=edge_palette)
         edge_weight = _get_edge_weight(graph, edge_weight_name)
         if edge_weight is not None:
             for _, _weight in edge_weight.items():
@@ -507,7 +507,7 @@ def _process_heterogeneous_graph(
                     f"etype {etype} was not found in reverse_etypes. reverse_etypes must contain all edge types."
                 )
         etype_colors = _get_colors(
-            _count_heterogeneous_edges(graph, reverse_etypes), etype_colors
+            _count_heterogeneous_edges(graph, reverse_etypes), etype_colors, palette_name=edge_palette
         )
         edge_weight = _get_edge_weight(graph, edge_weight_name)
         if edge_weight is not None:
@@ -541,6 +541,8 @@ def plot_graph(
     edge_weight_name: Union[str, None] = None,
     ntype_colors: Union[list[Color], None] = None,
     etype_colors: Union[list[Color], None] = None,
+    node_palette: str = "tab10",
+    edge_palette: str = "tab10",
     figsize: tuple[int, int] = (6, 4),
     reverse_etypes: Union[dict[str, str], None] = None,
     **kwargs,
@@ -566,6 +568,8 @@ def plot_graph(
             If None, a default color palette is used. Defaults to None.
         etype_colors (Union[list[Color], None], optional): A list of colors for edge types.
             If None, a default color palette is used. Defaults to None.
+        node_palette (str, optional): The name of the seaborn color palette to use for node types. Defaults to "tab10".
+        edge_palette (str, optional): The name of the seaborn color palette to use for edge types. Defaults to "tab10".
         figsize (tuple[int, int], optional): The figure size (width, height). Defaults to (6, 4).
         reverse_etypes (Union[dict[str, str], None], optional): A dictionary specifying reverse edge types for heterogeneous graphs.
             Keys are edge types, and values are the corresponding reverse edge types.
@@ -589,7 +593,7 @@ def plot_graph(
             edge_colors,
             edge_legend,
         ) = _process_homogeneous_graph(
-            graph, node_labels, ntype_colors, etype_colors, edge_weight_name
+            graph, node_labels, ntype_colors, etype_colors, edge_weight_name, node_palette, edge_palette
         )
     else:
         (
@@ -607,6 +611,8 @@ def plot_graph(
             etype_colors,
             edge_weight_name,
             reverse_etypes,
+            node_palette,
+            edge_palette,
         )
 
     return _plot(
