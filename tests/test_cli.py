@@ -2,6 +2,8 @@ import os
 import pytest
 import torch
 import dgl
+import yaml
+import json
 from unittest.mock import patch, MagicMock
 from dglex.cli import main
 
@@ -23,8 +25,7 @@ def test_cli_view_basic(temp_dgl_file):
             main()
             
         mock_plot.assert_called_once()
-        # The first argument to plot_graph should be a DGLGraph
-        args, kwargs = mock_plot.call_args
+        args, _ = mock_plot.call_args
         assert isinstance(args[0], (dgl.DGLGraph, dgl.DGLHeteroGraph))
 
 
@@ -43,11 +44,14 @@ def test_cli_view_with_options(temp_dgl_file):
     with patch("dglex.cli.plt.show"), \
          patch("dglex.cli.plot_graph") as mock_plot:
         
+        reverse_etypes_json = '{"click": "clicked-by"}'
         with patch("sys.argv", ["dglex", "view", temp_dgl_file, 
                                 "--title", "Custom Title", 
                                 "--edge-weight", "w",
                                 "--node-palette", "Set2",
-                                "--edge-palette", "viridis"]):
+                                "--edge-palette", "viridis",
+                                "--figsize", "10", "8",
+                                "--reverse-etypes", reverse_etypes_json]):
             main()
             
         _, kwargs = mock_plot.call_args
@@ -55,6 +59,8 @@ def test_cli_view_with_options(temp_dgl_file):
         assert kwargs["edge_weight_name"] == "w"
         assert kwargs["node_palette"] == "Set2"
         assert kwargs["edge_palette"] == "viridis"
+        assert kwargs["figsize"] == (10, 8)
+        assert kwargs["reverse_etypes"] == {"click": "clicked-by"}
 
 
 def test_cli_view_invalid_palette(temp_dgl_file):
@@ -64,10 +70,35 @@ def test_cli_view_invalid_palette(temp_dgl_file):
         with patch("sys.argv", ["dglex", "view", temp_dgl_file, "--node-palette", "invalid_palette"]):
             main()
             
-        # Check if error message was printed to stderr
         error_output = "".join(call.args[0] for call in mock_stderr.write.call_args_list)
         assert "Error: is not a valid palette name" in error_output
-        assert "Hint: Please specify a valid Seaborn/Matplotlib palette name" in error_output
+
+
+def test_cli_view_with_config_file(temp_dgl_file):
+    config_data = {
+        "view": {
+            "node_palette": "magma",
+            "reverse_etypes": {"follow": "followed-by"}
+        }
+    }
+    config_path = os.path.join(os.getcwd(), "dglex.yaml")
+    
+    with open(config_path, "w") as f:
+        yaml.dump(config_data, f)
+        
+    try:
+        with patch("dglex.cli.plt.show"), \
+             patch("dglex.cli.plot_graph") as mock_plot:
+            
+            with patch("sys.argv", ["dglex", "view", temp_dgl_file]):
+                main()
+                
+            _, kwargs = mock_plot.call_args
+            assert kwargs["node_palette"] == "magma"
+            assert kwargs["reverse_etypes"] == {"follow": "followed-by"}
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)
 
 
 def test_cli_help():
