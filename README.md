@@ -1,26 +1,36 @@
 # dglex
 ![workflow](https://github.com/masaponto/dglex/actions/workflows/test.yml/badge.svg)
-A DGL Extention library.
+A DGL Extension library.
 
 ## About
-This library is an extention of [DGL](https://www.dgl.ai/). It provides some useful functions for Graph Neural Network (GNN) projects.
+This library is an extension of [DGL](https://www.dgl.ai/). It provides some useful functions for Graph Neural Network (GNN) projects.
+
+## Features
+- Graph visualization for DGL graphs
+- CLI preview tool for `.bin` graph files
+- Support for heterogeneous graphs
+- Automatic sampling for large graphs
+- Configurable via `dglex.yaml`
 
 ## Support OS
-- MacOS Apple Silicon
-- Linux x86_64
+- macOS (Apple Silicon)
+- Linux (x86_64)
 
 ## Installation
+
+Install PyTorch and DGL first (see their official installation guides):
+
+- https://pytorch.org/get-started/locally/
+- https://www.dgl.ai/pages/start.html
+
+Then install `dglex`:
+
 ```bash
-pip install torch # see https://pytorch.org/get-started/locally/
-pip install dgl # see https://www.dgl.ai/pages/start.html
 pip install git+https://github.com/masaponto/dglex.git
 ```
 
-## Example
-### Graph Visualization
- See examples/visualization.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/visualization.ipynb)
-
-### CLI Preview Tool
+## Usage
+### CLI
 You can preview a DGL graph file (`.bin`) from the command line.
 
 ```bash
@@ -39,6 +49,10 @@ dglex view my_graph.bin --node-palette "Set2" --edge-palette "viridis"
 # Save the preview as an image
 dglex view my_graph.bin --output graph_preview.png
 ```
+
+### Jupyter Notebook
+ See examples/visualization.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/visualization.ipynb)
+
 
 ### Configuration File (`dglex.yaml`)
 You can also use a `dglex.yaml` file in your current directory to set default options for the `view` command. Command line arguments will override these settings.
@@ -73,6 +87,24 @@ view:
     max_edges: 5000      # Show warning if edges > 5000
     sample_size: 10      # Pick 10 seed nodes for sampling
     sample_fanouts: [20, 10] # 2-hop sampling: 20 edges at 1st hop, 10 at 2nd
+```
+
+## Troubleshooting
+If you're using WSL (Windows Subsystem for Linux) and `dglex view` doesn't display a window, or if you encounter the error:
+
+`FigureCanvasAgg is non-interactive, and thus cannot be shown`
+
+Matplotlib may be using a non-interactive backend (`Agg`). This happens when no GUI toolkit is available.
+
+Install an interactive backend:
+
+```bash
+pip install PyQt5
+```
+
+Alternatively, you can always save the graph as an image using the `--output` option:
+```bash
+dglex view my_graph.bin --output graph.png
 ```
 
 ## LICENSE
