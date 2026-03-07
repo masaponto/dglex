@@ -2,12 +2,10 @@ import dgl
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
-from typing import Union, Any, Optional
-from dataclasses import dataclass
+from typing import Union, Optional
+from dglex.visualisation.types import Color, Legend, PlotConfig
 
 from dglex.visualisation.style import (
-    Color,
-    Legend,
     _get_colors,
     _get_homogeneous_node_colors_and_legend,
     _get_heterogenous_node_colors_and_legend,
@@ -28,20 +26,6 @@ from dglex.visualisation.graph_ops import (
     _validate_target_nodes,
     _extract_subgraph,
 )
-
-
-@dataclass
-class PlotConfig:
-    """Configuration for graph visualization."""
-    title: str = ""
-    figsize: tuple[int, int] = (6, 4)
-    node_palette: str = "tab10"
-    edge_palette: str = "tab10"
-    node_labels: Optional[Union[dict[int, str], dict[str, dict[int, str]]]] = None
-    edge_weight_name: Optional[str] = None
-    ntype_colors: Optional[list[Color]] = None
-    etype_colors: Optional[list[Color]] = None
-    reverse_etypes: Optional[dict[str, str]] = None
 
 
 def _plot(
