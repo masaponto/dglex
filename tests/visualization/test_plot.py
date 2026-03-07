@@ -1,10 +1,11 @@
-import pytest
 import dgl
 import numpy as np
+import pytest
 import torch
-import networkx as nx
-from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
 from pytest_mock import MockerFixture
+
+from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
+
 
 @pytest.fixture
 def homogeneous_graph() -> dgl.DGLGraph:
@@ -87,7 +88,7 @@ def test_plot_homogeneous_graph_refactored(
     homogeneous_graph: dgl.DGLGraph, mock_nx_draw: MockerFixture, use_weight, node_palette
 ):
     edge_weight_name = "weight" if use_weight else None
-    ax = plot_graph(homogeneous_graph, edge_weight_name=edge_weight_name, node_palette=node_palette)
+    plot_graph(homogeneous_graph, edge_weight_name=edge_weight_name, node_palette=node_palette)
     mock_nx_draw.assert_called_once()
 
 @pytest.mark.parametrize("use_weight, use_reverse, node_palette", [
@@ -104,8 +105,8 @@ def test_plot_heterogeneous_graph_refactored(
     heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
     edge_weight_name = "weight" if use_weight else None
     rev = reverse_etypes if use_reverse else None
-    
-    ax = plot_graph(
+
+    plot_graph(
         heterogeneous_graph,
         edge_weight_name=edge_weight_name,
         reverse_etypes=rev,
@@ -126,10 +127,10 @@ def test_plot_subgraph_homogeneous_refactored(
     homogeneous_graph: dgl.DGLGraph, mock_nx_draw: MockerFixture, target_nodes, n_hop, use_fanouts
 ):
     fanouts = [2] * n_hop if use_fanouts else None
-    ax = plot_subgraph_with_neighbors(
-        homogeneous_graph, 
-        target_nodes=target_nodes, 
-        n_hop=n_hop, 
+    plot_subgraph_with_neighbors(
+        homogeneous_graph,
+        target_nodes=target_nodes,
+        n_hop=n_hop,
         fanouts=fanouts,
         edge_weight_name="weight"
     )
@@ -147,7 +148,7 @@ def test_plot_subgraph_heterogeneous_refactored(
 ):
     heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
     rev = reverse_etypes if use_reverse else None
-    
+
     # Define fanouts if needed
     fanouts = None
     if use_fanouts:
@@ -156,7 +157,7 @@ def test_plot_subgraph_heterogeneous_refactored(
         else:
             fanouts = [{"follow": 1, "click": 1, "dislike": 1, "followed-by": 1, "clicked-by": 1, "disliked-by": 1}] * n_hop
 
-    ax = plot_subgraph_with_neighbors(
+    plot_subgraph_with_neighbors(
         heterogeneous_graph,
         target_nodes=target_nodes,
         n_hop=n_hop,
@@ -181,14 +182,14 @@ def test_plot_parallel_edges_label_combination_homo(
     v = torch.tensor([1, 1, 2])
     g = dgl.graph((u, v))
     g.edata['w'] = torch.tensor([0.5, 0.8, 1.0])
-    
+
     plot_graph(g, edge_weight_name='w')
-    
+
     # Check that draw_networkx_edge_labels was called with combined labels
     mock_nx_draw_edge_labels.assert_called_once()
     _, kwargs = mock_nx_draw_edge_labels.call_args
     edge_labels = kwargs['edge_labels']
-    
+
     # The weights for (0, 1) should be combined
     assert edge_labels[(0, 1)] == "0.500, 0.800"
     assert edge_labels[(1, 2)] == "1.000"
@@ -207,16 +208,16 @@ def test_plot_parallel_edges_label_combination_hetero(
     g = dgl.heterograph({
         ('user', 'follow', 'user'): ([0, 0], [1, 1]),
     })
-    
-    # DGL: when only ONE edge type exists, edata['w'] must be a tensor directly, 
+
+    # DGL: when only ONE edge type exists, edata['w'] must be a tensor directly,
     # not a dictionary mapping etype to tensor.
     g.edata['w'] = torch.tensor([0.5, 0.8])
-    
+
     plot_graph(g, edge_weight_name='w')
-    
+
     mock_nx_draw_edge_labels.assert_called_once()
     _, kwargs = mock_nx_draw_edge_labels.call_args
     edge_labels = kwargs['edge_labels']
-    
+
     # NetworkX node IDs in dgl.to_homogeneous start with 0 for 'user'
     assert edge_labels[(0, 1)] == "0.500, 0.800"

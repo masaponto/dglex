@@ -1,7 +1,47 @@
 import argparse
-import sys
 import os
-from typing import Any, Dict
+import sys
+from typing import Any, Dict, Literal
+
+SamplingAction = Literal["continue", "random", "hub", "abort"]
+
+
+def _decide_sampling_action(
+    num_nodes: int,
+    num_edges: int,
+    limits: Dict[str, Any],
+    force: bool,
+    is_tty: bool,
+    has_output: bool,
+    user_choice: str,
+) -> SamplingAction:
+    """グラフサイズとユーザー選択からアクションを決定する純粋関数（I/O なし）。
+
+    Args:
+        num_nodes (int): グラフのノード数。
+        num_edges (int): グラフのエッジ数。
+        limits (Dict[str, Any]): max_nodes, max_edges を含む制限設定。
+        force (bool): --force フラグが指定されているか。
+        is_tty (bool): 標準入力が TTY か。
+        has_output (bool): 出力先ファイルが指定されているか。
+        user_choice (str): ユーザーの入力（"1"/"2"/"3"/"4"）。
+
+    Returns:
+        SamplingAction: "continue", "random", "hub", "abort" のいずれか。
+    """
+    is_large = num_nodes > limits["max_nodes"] or num_edges > limits["max_edges"]
+    if not is_large or force:
+        return "continue"
+    if not is_tty or has_output:
+        return "random"
+    if user_choice == "1":
+        return "continue"
+    elif user_choice == "3":
+        return "hub"
+    elif user_choice == "4":
+        return "abort"
+    else:
+        return "random"
 
 
 def load_config(config_path: str = "dglex.yaml") -> Dict[str, Any]:
@@ -71,7 +111,7 @@ def merge_config(args: argparse.Namespace, config: Dict[str, Any]) -> argparse.N
         "sample_size": 5,
         "sample_fanouts": [10],
     }
-    
+
     args_dict["limits"] = default_limits.copy()
     if "limits" in config and isinstance(config["limits"], dict):
         for key, value in config["limits"].items():
@@ -87,8 +127,9 @@ def view(args):
     """
     import dgl
     import matplotlib.pyplot as plt
-    from dglex.visualisation.plot import plot_graph, plot_subgraph_with_neighbors
+
     from dglex.visualisation.graph_ops import get_random_nodes, get_top_k_degree_nodes
+    from dglex.visualisation.plot import plot_graph, plot_subgraph_with_neighbors
 
     # Load and merge configuration
     config = load_config()
@@ -109,42 +150,39 @@ def view(args):
         return
 
     g = graphs[args.index]
-    
+
     # Check graph size
     num_nodes = g.num_nodes() if g.is_homogeneous else sum(g.num_nodes(ntype) for ntype in g.ntypes)
     num_edges = g.num_edges() if g.is_homogeneous else sum(g.num_edges(etype) for etype in g.canonical_etypes)
-    
+
     limits = args.limits
     is_large = num_nodes > limits["max_nodes"] or num_edges > limits["max_edges"]
-    
-    action = "continue"
+
+    user_choice = ""
     if is_large and not args.force:
-        print(f"\nWarning: Large graph detected!")
+        print("\nWarning: Large graph detected!")
         print(f"- Nodes: {num_nodes:,}")
         print(f"- Edges: {num_edges:,}")
-        print(f"\nRendering this graph may be slow or cause memory issues.")
-        
+        print("\nRendering this graph may be slow or cause memory issues.")
+
         if sys.stdin.isatty() and not args.output:
             print("\nHow would you like to proceed?")
             print("[1] Continue: Render the full graph anyway")
             print("[2] Random Sample (Default): Pick representative nodes randomly")
             print("[3] Hub Sample: Pick nodes with highest degrees")
             print("[4] Abort: Cancel the operation")
-            
-            choice = input("\nPlease select [1/2/3/4] (default 2): ").strip()
-            if choice == "1":
-                action = "continue"
-            elif choice == "3":
-                action = "hub"
-            elif choice == "4":
-                print("Operation aborted.")
-                return
-            else:
-                action = "random"
+            user_choice = input("\nPlease select [1/2/3/4] (default 2): ").strip()
         else:
             # Non-interactive or output specified: safety first
             print("Action: Automatic random sampling applied for safety. Use --force to override.", file=sys.stderr)
-            action = "random"
+
+    action = _decide_sampling_action(
+        num_nodes, num_edges, limits, args.force,
+        sys.stdin.isatty(), bool(args.output), user_choice
+    )
+    if action == "abort":
+        print("Operation aborted.")
+        return
 
     # Execution phase
     try:
@@ -156,7 +194,7 @@ def view(args):
             if figsize_arg is None:
                 figsize_arg = (6, 4)
 
-            ax = plot_graph(
+            plot_graph(
                 g,
                 title=args.title or f"Graph {args.index} from {args.path}",
                 edge_weight_name=args.edge_weight,
@@ -169,17 +207,17 @@ def view(args):
             # Sampling path
             sample_size = limits["sample_size"]
             sample_fanouts = limits["sample_fanouts"]
-            
+
             if action == "random":
                 target_nodes = get_random_nodes(g, k=sample_size)
                 mode_str = "Randomly selected"
             else: # hub
                 target_nodes = get_top_k_degree_nodes(g, k=sample_size)
                 mode_str = "Hub-based"
-            
+
             print(f"Sampling {sample_size} nodes ({action} mode) with fanouts {sample_fanouts}...")
-            
-            ax = plot_subgraph_with_neighbors(
+
+            plot_subgraph_with_neighbors(
                 g,
                 target_nodes=target_nodes,
                 n_hop=len(sample_fanouts),
@@ -196,7 +234,7 @@ def view(args):
             print(f"Saved preview to {args.output}")
         else:
             plt.show()
-            
+
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         print("Hint: Please specify a valid Seaborn/Matplotlib palette name.", file=sys.stderr)

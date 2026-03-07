@@ -1,31 +1,31 @@
+from typing import Optional, Union
+
 import dgl
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
-from typing import Union, Optional
-from dglex.visualisation.types import Color, Legend, PlotConfig
 
-from dglex.visualisation.style import (
-    _get_colors,
-    _get_homogeneous_node_colors_and_legend,
-    _get_heterogenous_node_colors_and_legend,
-    _get_homogeneous_edge_colors_and_legend,
-    _get_heterogeneous_edge_colors_and_legend,
-    _get_heterogeneous_edge_colors_and_legend_reverse_etypes,
-    _get_homogenous_node_labels,
-    _get_heterogenous_node_labels,
-    _get_homogeneous_edge_labels,
-    _get_heterogeneous_edge_labels,
-    _get_heterogeneous_edge_labels_reverse_etypes,
-)
 from dglex.visualisation.graph_ops import (
+    _count_heterogeneous_edges,
+    _create_ueid_master,
+    _extract_subgraph,
     _get_edge_weight,
     _validate_edge_weight,
-    _create_ueid_master,
-    _count_heterogeneous_edges,
     _validate_target_nodes,
-    _extract_subgraph,
 )
+from dglex.visualisation.style import (
+    _get_colors,
+    _get_heterogeneous_edge_colors_and_legend,
+    _get_heterogeneous_edge_colors_and_legend_reverse_etypes,
+    _get_heterogeneous_edge_labels,
+    _get_heterogeneous_node_colors_and_legend,
+    _get_heterogeneous_node_labels,
+    _get_homogeneous_edge_colors_and_legend,
+    _get_homogeneous_edge_labels,
+    _get_homogeneous_node_colors_and_legend,
+    _get_homogeneous_node_labels,
+)
+from dglex.visualisation.types import Color, Legend, PlotConfig
 
 
 def _plot(
@@ -71,22 +71,22 @@ def _process_homogeneous_graph(
     node_attrs = [dgl.NID] if dgl.NID in graph.ndata else []
     edge_attrs = [dgl.EID] if dgl.EID in graph.edata else []
     ng = dgl.to_networkx(graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
-    
-    node_labels = _get_homogenous_node_labels(graph, ng, config.node_labels)
+
+    node_labels = _get_homogeneous_node_labels(graph, ng, config.node_labels)  # type: ignore[arg-type]
     ntype_colors = _get_colors(1, config.ntype_colors, palette_name=config.node_palette)
     etype_colors = _get_colors(1, config.etype_colors, palette_name=config.edge_palette)
-    
+
     edge_weight = _get_edge_weight(graph, config.edge_weight_name)
     _validate_edge_weight(
         edge_weight, edge_weight.shape if edge_weight is not None else None
     )
-    
+
     edge_labels = _get_homogeneous_edge_labels(graph, edge_weight)
     node_colors, node_legend = _get_homogeneous_node_colors_and_legend(ntype_colors)
     edge_colors, edge_legend = _get_homogeneous_edge_colors_and_legend(
         etype_colors, edge_weight
     )
-    
+
     return (
         ng,
         node_labels,
@@ -106,12 +106,12 @@ def _process_heterogeneous_graph(
     node_attrs = [dgl.NID, dgl.NTYPE]
     edge_attrs = [dgl.EID, dgl.ETYPE]
     ng = dgl.to_networkx(homo_graph, node_attrs=node_attrs, edge_attrs=edge_attrs)
-    
-    node_labels = _get_heterogenous_node_labels(graph, ng, config.node_labels)
+
+    node_labels = _get_heterogeneous_node_labels(graph, ng, config.node_labels)  # type: ignore[arg-type]
     ntype_colors = _get_colors(
         len(graph.ntypes), config.ntype_colors, palette_name=config.node_palette
     )
-    node_colors, node_legend = _get_heterogenous_node_colors_and_legend(
+    node_colors, node_legend = _get_heterogeneous_node_colors_and_legend(
         graph, ng, ntype_colors
     )
 
@@ -123,7 +123,7 @@ def _process_heterogeneous_graph(
         if edge_weight is not None:
             for _, _weight in edge_weight.items():
                 _validate_edge_weight(_weight, _weight.shape)
-        
+
         edge_labels = _get_heterogeneous_edge_labels(graph, ng, edge_weight)
         edge_colors, edge_legend = _get_heterogeneous_edge_colors_and_legend(
             graph, ng, etype_colors, edge_weight
@@ -134,7 +134,7 @@ def _process_heterogeneous_graph(
                 raise ValueError(
                     f"etype {etype} was not found in reverse_etypes. reverse_etypes must contain all edge types."
                 )
-        
+
         etype_colors = _get_colors(
             _count_heterogeneous_edges(graph, config.reverse_etypes),
             config.etype_colors,
@@ -144,11 +144,9 @@ def _process_heterogeneous_graph(
         if edge_weight is not None:
             for _, _weight in edge_weight.items():
                 _validate_edge_weight(_weight, _weight.shape)
-        
+
         ueid_master = _create_ueid_master(graph, config.reverse_etypes)
-        edge_labels = _get_heterogeneous_edge_labels_reverse_etypes(
-            graph, ng, edge_weight
-        )
+        edge_labels = _get_heterogeneous_edge_labels(graph, ng, edge_weight)
         edge_colors, edge_legend = (
             _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
                 graph, ng, etype_colors, ueid_master, edge_weight

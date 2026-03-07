@@ -1,16 +1,18 @@
+import random
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import dgl
 import torch
-import sys
-import random
-from typing import Union, Any, Optional, Dict, List, Tuple
-from dataclasses import dataclass
-from collections import defaultdict
+
 
 @dataclass
 class EdgeTypeInfo:
     """
     Information about an edge type, used for mapping original edge types to unique identities (ueid).
-    
+
     Attributes:
         etype (str): Original edge type name.
         eid (int): Edge type ID in the DGL graph.
@@ -47,9 +49,9 @@ def get_random_nodes(
             n_count = graph.num_nodes(ntype)
             for nid in range(n_count):
                 all_nodes.append((ntype, nid))
-        
+
         selected = random.sample(all_nodes, min(k, len(all_nodes)))
-        
+
         result = defaultdict(list)
         for ntype, nid in selected:
             result[ntype].append(nid)
@@ -76,20 +78,20 @@ def get_top_k_degree_nodes(
         return indices.tolist()
     else:
         total_degrees = {ntype: torch.zeros(graph.num_nodes(ntype)) for ntype in graph.ntypes}
-        
+
         for srctype, etype, dsttype in graph.canonical_etypes:
             total_degrees[srctype] += graph.out_degrees(etype=etype)
             total_degrees[dsttype] += graph.in_degrees(etype=etype)
-            
+
         all_nodes_with_degree = []
         for ntype in graph.ntypes:
             for nid, degree in enumerate(total_degrees[ntype].tolist()):
                 all_nodes_with_degree.append((ntype, nid, degree))
-        
+
         # Sort by degree descending
         all_nodes_with_degree.sort(key=lambda x: x[2], reverse=True)
         selected = all_nodes_with_degree[:min(k, len(all_nodes_with_degree))]
-        
+
         result = defaultdict(list)
         for ntype, nid, _ in selected:
             result[ntype].append(nid)
@@ -163,6 +165,30 @@ def _create_ueid_master(
             etype_legend_name=_etype,
         )
     return ueid_master
+
+def _get_num_workers() -> int:
+    """macOS では multiprocessing 非対応のため 0 を返す。
+
+    Returns:
+        int: macOS の場合は 0、それ以外は 1。
+    """
+    return 0 if sys.platform == "darwin" else 1
+
+
+def _run_dataloader(dataloader: Any) -> tuple:
+    """DataLoader から1バッチ取り出す（macOS/Linux 対応）。
+
+    Args:
+        dataloader: DGL の DataLoader インスタンス。
+
+    Returns:
+        tuple: (input_nodes, output_nodes, blocks) のタプル。
+    """
+    if sys.platform == "darwin":
+        return next(iter(dataloader))
+    with dataloader.enable_cpu_affinity():
+        return next(iter(dataloader))
+
 
 def _validate_edge_weight(edge_weight: Optional[torch.Tensor], shape: Any):
     """
@@ -248,14 +274,14 @@ def _extract_heterogeneous_subgraph_nhop(
             sg = dgl.in_subgraph(hetero_graph, seed_nodes, relabel_nodes=True)
             break
         sg = dgl.in_subgraph(hetero_graph, seed_nodes)
-        seed_nodes = defaultdict(list)
+        new_seed_nodes: Dict[str, List[int]] = defaultdict(list)
         for src_ntype, etype, dst_ntype in hetero_graph.canonical_etypes:
             src, dst = sg.edges(etype=etype)
-            seed_nodes[src_ntype].extend(src.tolist())
-            seed_nodes[dst_ntype].extend(dst.tolist())
-            seed_nodes[src_ntype] = list(set(seed_nodes[src_ntype]))
-            seed_nodes[dst_ntype] = list(set(seed_nodes[dst_ntype]))
-        seed_nodes = {ntype: torch.tensor(nodes) for ntype, nodes in seed_nodes.items()}
+            new_seed_nodes[src_ntype].extend(src.tolist())
+            new_seed_nodes[dst_ntype].extend(dst.tolist())
+            new_seed_nodes[src_ntype] = list(set(new_seed_nodes[src_ntype]))
+            new_seed_nodes[dst_ntype] = list(set(new_seed_nodes[dst_ntype]))
+        seed_nodes = {ntype: torch.tensor(nodes) for ntype, nodes in new_seed_nodes.items()}
 
     sampled_node_labels = {}
     for ntype in hetero_graph.ntypes:
@@ -293,14 +319,10 @@ def _extract_sub_graph_nhop_fanouts(
         batch_size=len(target_nodes),
         shuffle=False,
         drop_last=False,
-        num_workers=(0 if sys.platform == "darwin" else 1),
+        num_workers=_get_num_workers(),
     )
 
-    if sys.platform == "darwin":
-        input_nodes, output_nodes, blocks = next(iter(dataloader))
-    else:
-        with dataloader.enable_cpu_affinity():
-            input_nodes, output_nodes, blocks = next(iter(dataloader))
+    input_nodes, output_nodes, blocks = _run_dataloader(dataloader)
 
     _src, _dst, _edge_weight = [], [], []
     sampled_node_labels = {}
@@ -350,17 +372,13 @@ def _extract_heterogeneous_sub_graph_nhop_fanouts(
         batch_size=sum(len(v) for v in target_nodes.values()),
         shuffle=False,
         drop_last=False,
-        num_workers=(0 if sys.platform == "darwin" else 1),
+        num_workers=_get_num_workers(),
     )
 
-    if sys.platform == "darwin":
-        input_nodes, output_nodes, blocks = next(iter(dataloader))
-    else:
-        with dataloader.enable_cpu_affinity():
-            input_nodes, output_nodes, blocks = next(iter(dataloader))
+    input_nodes, output_nodes, blocks = _run_dataloader(dataloader)
 
     graph_dic, edge_weight_dic = {}, {}
-    sampled_node_labels = {ntype: {} for ntype in graph.ntypes}
+    sampled_node_labels: Dict[str, Dict[int, str]] = {ntype: {} for ntype in graph.ntypes}
     node_labels = ({ntype: {} for ntype in graph.ntypes} if node_labels is None else node_labels)
 
     for src_ntype, etype, dst_ntype in graph.canonical_etypes:

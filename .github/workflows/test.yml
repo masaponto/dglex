@@ -8,6 +8,7 @@ on:
       - 'tests/**'
       - '!**.md'
       - 'uv.lock'
+      - 'pyproject.toml'
   pull_request:
     branches: [ "main" ]
     paths:
@@ -15,6 +16,7 @@ on:
       - 'tests/**'
       - '!**.md'
       - 'uv.lock'
+      - 'pyproject.toml'
 
 jobs:
   uv-test:
@@ -34,5 +36,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        # For example, using `pytest`
         run: uv run pytest
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
