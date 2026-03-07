@@ -1,6 +1,7 @@
-import matplotlib
-from typing import Optional, Dict, List, Tuple, Union, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import matplotlib
 
 # Type aliases for better readability
 Color = Any
