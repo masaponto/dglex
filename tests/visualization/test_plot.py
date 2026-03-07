@@ -2,6 +2,7 @@ import pytest
 import dgl
 import numpy as np
 import torch
+import networkx as nx
 from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
 from pytest_mock import MockerFixture
 
@@ -71,6 +72,10 @@ def heterogeneous_graph_and_reverse_etypes() -> (
 @pytest.fixture
 def mock_nx_draw(mocker: MockerFixture):
     return mocker.patch("networkx.draw")
+
+@pytest.fixture
+def mock_nx_draw_edge_labels(mocker: MockerFixture):
+    return mocker.patch("networkx.draw_networkx_edge_labels")
 
 # --- Refactored tests for plot_graph ---
 
@@ -160,3 +165,58 @@ def test_plot_subgraph_heterogeneous_refactored(
         edge_weight_name="weight"
     )
     mock_nx_draw.assert_called_once()
+
+
+# --- Specialized tests for Parallel Edges Label Combination ---
+
+def test_plot_parallel_edges_label_combination_homo(
+    mock_nx_draw: MockerFixture,
+    mock_nx_draw_edge_labels: MockerFixture
+):
+    """
+    Verify that multiple edge weights between the same nodes are combined with a comma for homogeneous graphs.
+    """
+    # Create parallel edges: 0 -> 1 (weight 0.5) and 0 -> 1 (weight 0.8)
+    u = torch.tensor([0, 0, 1])
+    v = torch.tensor([1, 1, 2])
+    g = dgl.graph((u, v))
+    g.edata['w'] = torch.tensor([0.5, 0.8, 1.0])
+    
+    plot_graph(g, edge_weight_name='w')
+    
+    # Check that draw_networkx_edge_labels was called with combined labels
+    mock_nx_draw_edge_labels.assert_called_once()
+    _, kwargs = mock_nx_draw_edge_labels.call_args
+    edge_labels = kwargs['edge_labels']
+    
+    # The weights for (0, 1) should be combined
+    assert edge_labels[(0, 1)] == "0.500, 0.800"
+    assert edge_labels[(1, 2)] == "1.000"
+
+
+def test_plot_parallel_edges_label_combination_hetero(
+    mock_nx_draw: MockerFixture,
+    mock_nx_draw_edge_labels: MockerFixture
+):
+    """
+    Verify that multiple edge weights between the same nodes are combined with a comma for heterogeneous graphs.
+    """
+    # Create parallel edges with different etypes:
+    # user_0 -> user_1 via 'follow' (weight 0.5)
+    # user_0 -> user_1 via 'follow' (weight 0.8) - another parallel edge in same type
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): ([0, 0], [1, 1]),
+    })
+    
+    # DGL: when only ONE edge type exists, edata['w'] must be a tensor directly, 
+    # not a dictionary mapping etype to tensor.
+    g.edata['w'] = torch.tensor([0.5, 0.8])
+    
+    plot_graph(g, edge_weight_name='w')
+    
+    mock_nx_draw_edge_labels.assert_called_once()
+    _, kwargs = mock_nx_draw_edge_labels.call_args
+    edge_labels = kwargs['edge_labels']
+    
+    # NetworkX node IDs in dgl.to_homogeneous start with 0 for 'user'
+    assert edge_labels[(0, 1)] == "0.500, 0.800"
