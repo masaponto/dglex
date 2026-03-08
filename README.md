@@ -31,6 +31,48 @@ pip install git+https://github.com/masaponto/dglex.git
 
 ## Usage
 ### CLI
+
+#### `info` — Inspect graph file structure
+Display the node counts, edge counts, and feature information of a DGL graph file (`.bin`).
+
+```bash
+dglex info my_graph.bin
+```
+
+Example output (heterogeneous graph):
+
+```
+Graph Summary
+-------------
+Graphs in file : 1
+Graph type     : heterogeneous
+
+Nodes
+-----
+user : 3
+item : 3
+
+Edges
+-----
+user -> user : 3
+user -> item : 4
+item -> user : 4
+
+Node Features
+-------------
+user.age       : float32 (3, 1)
+user.embedding : float32 (3, 16)
+item.price     : float32 (3, 1)
+item.embedding : float32 (3, 16)
+
+Edge Features
+-------------
+user->item.weight : float32 (4, 1)
+```
+
+---
+
+#### `view` — Visualize a graph
 You can preview a DGL graph file (`.bin`) from the command line.
 
 ```bash

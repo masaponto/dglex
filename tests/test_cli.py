@@ -6,7 +6,8 @@ import pytest
 import torch
 import yaml
 
-from dglex.cli import _decide_sampling_action, main
+from dglex.cli import main
+from dglex.view import _decide_sampling_action
 
 DEFAULT_LIMITS = {"max_nodes": 500, "max_edges": 2000}
 
@@ -177,3 +178,113 @@ def test_cli_help():
         with pytest.raises(SystemExit) as e:
             main()
         assert e.value.code == 0
+
+
+# ---------------------------------------------------------------------------
+# info コマンドのテスト
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def homo_graph_file(tmp_path):
+    """ノード特徴量付きの homogeneous グラフファイルを作成する。"""
+    g = dgl.graph(([0, 1, 2], [1, 2, 0]))
+    g.ndata["feat"] = torch.zeros(3, 4, dtype=torch.float32)
+    file_path = os.path.join(tmp_path, "homo_graph.bin")
+    dgl.save_graphs(file_path, [g])
+    return file_path
+
+
+@pytest.fixture
+def hetero_graph_file(tmp_path):
+    """エッジ特徴量付きの heterogeneous グラフファイルを作成する。"""
+    g = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([0, 1], [1, 2]),
+            ("user", "rates", "item"): ([0, 0], [0, 1]),
+        },
+        num_nodes_dict={"user": 3, "item": 2},
+    )
+    g.nodes["user"].data["age"] = torch.ones(3, 1, dtype=torch.float32)
+    g.edges[("user", "rates", "item")].data["weight"] = torch.ones(2, 1, dtype=torch.float32)
+    file_path = os.path.join(tmp_path, "hetero_graph.bin")
+    dgl.save_graphs(file_path, [g])
+    return file_path
+
+
+def test_info_homo_graph_summary(homo_graph_file, capsys):
+    """homogeneous グラフの Graph Summary / Nodes / Edges が出力されることを確認。"""
+    with patch("sys.argv", ["dglex", "info", homo_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Graph Summary" in captured.out
+    assert "Graphs in file : 1" in captured.out
+    assert "Graph type     : homogeneous" in captured.out
+    assert "Nodes" in captured.out
+    assert "Edges" in captured.out
+
+
+def test_info_hetero_graph_ntypes_etypes(hetero_graph_file, capsys):
+    """heterogeneous グラフの ntype / etype ごとの表示を確認。"""
+    with patch("sys.argv", ["dglex", "info", hetero_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Graph type     : heterogeneous" in captured.out
+    assert "user" in captured.out
+    assert "item" in captured.out
+    assert "user -> user" in captured.out or "follows" in captured.out
+    assert "user -> item" in captured.out or "rates" in captured.out
+
+
+def test_info_node_features(homo_graph_file, capsys):
+    """Node Features セクションに dtype と shape が出力されることを確認。"""
+    with patch("sys.argv", ["dglex", "info", homo_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Node Features" in captured.out
+    assert "float32" in captured.out
+    assert "(3, 4)" in captured.out
+
+
+def test_info_edge_features_shown_when_present(hetero_graph_file, capsys):
+    """エッジ特徴量が存在する場合に Edge Features セクションが出力されることを確認。"""
+    with patch("sys.argv", ["dglex", "info", hetero_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Edge Features" in captured.out
+    assert "weight" in captured.out
+
+
+def test_info_no_edge_features_section_when_absent(homo_graph_file, capsys):
+    """エッジ特徴量がない場合に Edge Features セクションが出力されないことを確認。"""
+    with patch("sys.argv", ["dglex", "info", homo_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Edge Features" not in captured.out
+
+
+def test_info_file_not_found(tmp_path, capsys):
+    """存在しないファイルを指定した場合に 'Error: file not found' が stderr に出力されることを確認。"""
+    missing_path = os.path.join(tmp_path, "nonexistent.bin")
+    with patch("sys.argv", ["dglex", "info", missing_path]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Error: file not found" in captured.err
+
+
+def test_info_invalid_file(tmp_path, capsys):
+    """無効なファイルを指定した場合に 'Error: file does not contain a valid DGL graph' が stderr に出力されることを確認。"""
+    invalid_file = os.path.join(tmp_path, "invalid.bin")
+    with open(invalid_file, "w") as f:
+        f.write("not a dgl file")
+
+    with patch("sys.argv", ["dglex", "info", invalid_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Error: file does not contain a valid DGL graph" in captured.err
