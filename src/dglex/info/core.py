@@ -1,11 +1,60 @@
 import argparse
+import statistics
 import sys
 from typing import TYPE_CHECKING, Dict, List
 
-from dglex.info.types import FeatureInfo, GraphInfo
+from dglex.info.types import DegreeStats, FeatureInfo, GraphInfo, NodeDegreeStats
 
 if TYPE_CHECKING:
     import dgl
+
+
+def _build_degree_stats(values: List[int]) -> DegreeStats:
+    """次数配列から統計情報を算出する。"""
+    if not values:
+        return DegreeStats(mean=0.0, median=0.0, min=0.0, max=0.0)
+
+    mean = float(sum(values)) / len(values)
+    return DegreeStats(
+        mean=mean,
+        median=float(statistics.median(values)),
+        min=float(min(values)),
+        max=float(max(values)),
+    )
+
+
+def _compute_degree_stats(g: "dgl.DGLGraph") -> Dict[str, NodeDegreeStats]:
+    """ノード種別ごとの in/out 次数統計を返す。"""
+    degree_stats: Dict[str, NodeDegreeStats] = {}
+
+    if g.is_homogeneous:
+        in_vals = g.in_degrees().tolist()
+        out_vals = g.out_degrees().tolist()
+        degree_stats["_N"] = NodeDegreeStats(
+            in_degree=_build_degree_stats(in_vals),
+            out_degree=_build_degree_stats(out_vals),
+        )
+        return degree_stats
+
+    for ntype in g.ntypes:
+        num_nodes = g.num_nodes(ntype)
+        in_degree_values = [0] * num_nodes
+        out_degree_values = [0] * num_nodes
+
+        for src_type, etype, dst_type in g.canonical_etypes:
+            if dst_type == ntype:
+                for idx, degree in enumerate(g.in_degrees(etype=(src_type, etype, dst_type)).tolist()):
+                    in_degree_values[idx] += int(degree)
+            if src_type == ntype:
+                for idx, degree in enumerate(g.out_degrees(etype=(src_type, etype, dst_type)).tolist()):
+                    out_degree_values[idx] += int(degree)
+
+        degree_stats[ntype] = NodeDegreeStats(
+            in_degree=_build_degree_stats(in_degree_values),
+            out_degree=_build_degree_stats(out_degree_values),
+        )
+
+    return degree_stats
 
 
 def _format_graph_info(g: "dgl.DGLGraph", graphs_count: int) -> str:
@@ -47,6 +96,22 @@ def _format_graph_info(g: "dgl.DGLGraph", graphs_count: int) -> str:
         for src_type, etype, dst_type in g.canonical_etypes:
             label = f"{src_type} -> {dst_type}"
             lines.append(f"{label} : {g.num_edges((src_type, etype, dst_type)):,}")
+
+    degree_stats = _compute_degree_stats(g)
+    lines.append("")
+    lines.append("Degree Statistics")
+    lines.append("-----------------")
+    for ntype, stats in degree_stats.items():
+        lines.append(
+            f"{ntype} in  : mean={stats.in_degree.mean:.2f} "
+            f"median={stats.in_degree.median:.2f} "
+            f"min={stats.in_degree.min:.2f} max={stats.in_degree.max:.2f}"
+        )
+        lines.append(
+            f"{ntype} out : mean={stats.out_degree.mean:.2f} "
+            f"median={stats.out_degree.median:.2f} "
+            f"min={stats.out_degree.min:.2f} max={stats.out_degree.max:.2f}"
+        )
 
     # Node Features
     has_node_features = False
@@ -157,6 +222,7 @@ def get_graph_info(g: "dgl.DGLGraph", graphs_count: int = 1) -> GraphInfo:
                     dtype=dtype, shape=tuple(tensor.shape)
                 )
 
+    degree_stats = _compute_degree_stats(g)
     summary = _format_graph_info(g, graphs_count)
 
     return GraphInfo(
@@ -166,6 +232,7 @@ def get_graph_info(g: "dgl.DGLGraph", graphs_count: int = 1) -> GraphInfo:
         num_edges=num_edges,
         node_features=node_features,
         edge_features=edge_features,
+        degree_stats=degree_stats,
         summary=summary,
     )
 

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
 
@@ -16,6 +16,31 @@ class FeatureInfo:
 
 
 @dataclass
+class DegreeStats:
+    """次数統計情報。
+
+    Attributes:
+        mean: 平均次数。
+        median: 中央値次数。
+        min: 最小次数。
+        max: 最大次数。
+    """
+
+    mean: float
+    median: float
+    min: float
+    max: float
+
+
+@dataclass
+class NodeDegreeStats:
+    """ノード種別ごとの in/out 次数統計。"""
+
+    in_degree: DegreeStats
+    out_degree: DegreeStats
+
+
+@dataclass
 class GraphInfo:
     """DGL グラフの構造情報をまとめた dataclass。
 
@@ -26,6 +51,7 @@ class GraphInfo:
         num_edges: エッジタイプごとのエッジ数辞書。homogeneous の場合は {"_E": n}。
         node_features: ノード特徴量の辞書。キーは "ntype.feat_name"（homogeneous の場合は "feat_name"）。
         edge_features: エッジ特徴量の辞書。キーは "src->dst.feat_name"（homogeneous の場合は "feat_name"）。
+        degree_stats: ノード種別ごとの in/out 次数統計。
         summary: CLI と同じテキスト形式の要約文字列。
     """
 
@@ -36,6 +62,7 @@ class GraphInfo:
     node_features: Dict[str, FeatureInfo]
     edge_features: Dict[str, FeatureInfo]
     summary: str
+    degree_stats: Dict[str, NodeDegreeStats] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """summary テキストを返す。

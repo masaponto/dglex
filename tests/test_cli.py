@@ -212,7 +212,7 @@ def hetero_graph_file(tmp_path):
 
 
 def test_info_homo_graph_summary(homo_graph_file, capsys):
-    """homogeneous グラフの Graph Summary / Nodes / Edges が出力されることを確認。"""
+    """homogeneous グラフの主要セクションが出力されることを確認。"""
     with patch("sys.argv", ["dglex", "info", homo_graph_file]):
         main()
 
@@ -222,6 +222,9 @@ def test_info_homo_graph_summary(homo_graph_file, capsys):
     assert "Graph type     : homogeneous" in captured.out
     assert "Nodes" in captured.out
     assert "Edges" in captured.out
+    assert "Degree Statistics" in captured.out
+    assert "_N in  :" in captured.out
+    assert "_N out :" in captured.out
 
 
 def test_info_hetero_graph_ntypes_etypes(hetero_graph_file, capsys):
@@ -235,6 +238,8 @@ def test_info_hetero_graph_ntypes_etypes(hetero_graph_file, capsys):
     assert "item" in captured.out
     assert "user -> user" in captured.out or "follows" in captured.out
     assert "user -> item" in captured.out or "rates" in captured.out
+    assert "user in  :" in captured.out
+    assert "item out :" in captured.out
 
 
 def test_info_node_features(homo_graph_file, capsys):

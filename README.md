@@ -33,7 +33,7 @@ pip install git+https://github.com/masaponto/dglex.git
 ### CLI
 
 #### `info` — Inspect graph file structure
-Display the node counts, edge counts, and feature information of a DGL graph file (`.bin`).
+Display node counts, edge counts, degree statistics (mean/median/min/max per node type), and feature information of a DGL graph file (`.bin`).
 
 ```bash
 dglex info my_graph.bin
@@ -57,6 +57,13 @@ Edges
 user -> user : 3
 user -> item : 4
 item -> user : 4
+
+Degree Statistics
+-----------------
+user in  : mean=2.33 median=2.00 min=1.00 max=4.00
+user out : mean=2.33 median=2.00 min=1.00 max=4.00
+item in  : mean=2.67 median=3.00 min=2.00 max=3.00
+item out : mean=2.67 median=3.00 min=2.00 max=3.00
 
 Node Features
 -------------

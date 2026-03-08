@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from dglex import GraphInfo, get_graph_info
-from dglex.info.types import FeatureInfo
+from dglex.info.types import DegreeStats, FeatureInfo, NodeDegreeStats
 
 
 @pytest.fixture
@@ -108,6 +108,23 @@ def test_homo_returns_graph_info_type(homo_graph):
     """返り値が GraphInfo 型であることを確認。"""
     info = get_graph_info(homo_graph)
     assert isinstance(info, GraphInfo)
+    assert "_N" in info.degree_stats
+    assert isinstance(info.degree_stats["_N"], NodeDegreeStats)
+
+
+def test_homo_degree_stats(homo_graph):
+    """homogeneous グラフで in/out 次数統計が算出されることを確認。"""
+    info = get_graph_info(homo_graph)
+    stats = info.degree_stats["_N"]
+    assert isinstance(stats.in_degree, DegreeStats)
+    assert stats.in_degree.mean == pytest.approx(1.0)
+    assert stats.in_degree.median == pytest.approx(1.0)
+    assert stats.in_degree.min == pytest.approx(1.0)
+    assert stats.in_degree.max == pytest.approx(1.0)
+    assert stats.out_degree.mean == pytest.approx(1.0)
+    assert stats.out_degree.median == pytest.approx(1.0)
+    assert stats.out_degree.min == pytest.approx(1.0)
+    assert stats.out_degree.max == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +181,31 @@ def test_hetero_no_node_features_for_item(hetero_graph):
     assert item_keys == []
 
 
+def test_hetero_degree_stats(hetero_graph):
+    """heterogeneous グラフで ntype ごとの in/out 次数統計が算出されることを確認。"""
+    info = get_graph_info(hetero_graph)
+
+    user = info.degree_stats["user"]
+    assert user.in_degree.mean == pytest.approx(2 / 3)
+    assert user.in_degree.median == pytest.approx(1.0)
+    assert user.in_degree.min == pytest.approx(0.0)
+    assert user.in_degree.max == pytest.approx(1.0)
+    assert user.out_degree.mean == pytest.approx(4 / 3)
+    assert user.out_degree.median == pytest.approx(1.0)
+    assert user.out_degree.min == pytest.approx(0.0)
+    assert user.out_degree.max == pytest.approx(3.0)
+
+    item = info.degree_stats["item"]
+    assert item.in_degree.mean == pytest.approx(1.0)
+    assert item.in_degree.median == pytest.approx(1.0)
+    assert item.in_degree.min == pytest.approx(1.0)
+    assert item.in_degree.max == pytest.approx(1.0)
+    assert item.out_degree.mean == pytest.approx(0.0)
+    assert item.out_degree.median == pytest.approx(0.0)
+    assert item.out_degree.min == pytest.approx(0.0)
+    assert item.out_degree.max == pytest.approx(0.0)
+
+
 # ---------------------------------------------------------------------------
 # グラフ特徴量なし
 # ---------------------------------------------------------------------------
@@ -180,3 +222,22 @@ def test_no_features_graph(edges, expected_nodes, expected_edges):
     assert info.edge_features == {}
     assert info.num_nodes == expected_nodes
     assert info.num_edges == expected_edges
+
+
+def test_empty_ntype_degree_stats_are_zero():
+    """ノード数 0 の ntype は次数統計が 0.0 で埋まることを確認。"""
+    g = dgl.heterograph(
+        {("user", "follows", "user"): ([0], [1])},
+        num_nodes_dict={"user": 2, "ghost": 0},
+    )
+
+    info = get_graph_info(g)
+    ghost = info.degree_stats["ghost"]
+    assert ghost.in_degree.mean == pytest.approx(0.0)
+    assert ghost.in_degree.median == pytest.approx(0.0)
+    assert ghost.in_degree.min == pytest.approx(0.0)
+    assert ghost.in_degree.max == pytest.approx(0.0)
+    assert ghost.out_degree.mean == pytest.approx(0.0)
+    assert ghost.out_degree.median == pytest.approx(0.0)
+    assert ghost.out_degree.min == pytest.approx(0.0)
+    assert ghost.out_degree.max == pytest.approx(0.0)
