@@ -87,6 +87,7 @@ def mock_nx_draw_edge_labels(mocker: MockerFixture):
 def test_plot_homogeneous_graph_refactored(
     homogeneous_graph: dgl.DGLGraph, mock_nx_draw: MockerFixture, use_weight, node_palette
 ):
+    """同種グラフの描画で draw が1回呼ばれることを確認する。"""
     edge_weight_name = "weight" if use_weight else None
     plot_graph(homogeneous_graph, edge_weight_name=edge_weight_name, node_palette=node_palette)
     mock_nx_draw.assert_called_once()
@@ -102,6 +103,7 @@ def test_plot_heterogeneous_graph_refactored(
     mock_nx_draw: MockerFixture,
     use_weight, use_reverse, node_palette
 ):
+    """異種グラフの各条件で draw が1回呼ばれることを確認する。"""
     heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
     edge_weight_name = "weight" if use_weight else None
     rev = reverse_etypes if use_reverse else None
@@ -126,6 +128,7 @@ def test_plot_heterogeneous_graph_refactored(
 def test_plot_subgraph_homogeneous_refactored(
     homogeneous_graph: dgl.DGLGraph, mock_nx_draw: MockerFixture, target_nodes, n_hop, use_fanouts
 ):
+    """同種グラフの近傍サブグラフ描画で draw が呼ばれることを確認する。"""
     fanouts = [2] * n_hop if use_fanouts else None
     plot_subgraph_with_neighbors(
         homogeneous_graph,
@@ -146,6 +149,7 @@ def test_plot_subgraph_heterogeneous_refactored(
     mock_nx_draw: MockerFixture,
     target_nodes, n_hop, use_fanouts, use_reverse
 ):
+    """異種グラフの近傍サブグラフ描画で draw が呼ばれることを確認する。"""
     heterogeneous_graph, reverse_etypes = heterogeneous_graph_and_reverse_etypes
     rev = reverse_etypes if use_reverse else None
 
@@ -174,9 +178,7 @@ def test_plot_parallel_edges_label_combination_homo(
     mock_nx_draw: MockerFixture,
     mock_nx_draw_edge_labels: MockerFixture
 ):
-    """
-    Verify that multiple edge weights between the same nodes are combined with a comma for homogeneous graphs.
-    """
+    """同じノード対の複数エッジ重みがカンマ結合で表示されることを確認する。"""
     # Create parallel edges: 0 -> 1 (weight 0.5) and 0 -> 1 (weight 0.8)
     u = torch.tensor([0, 0, 1])
     v = torch.tensor([1, 1, 2])
@@ -199,9 +201,7 @@ def test_plot_parallel_edges_label_combination_hetero(
     mock_nx_draw: MockerFixture,
     mock_nx_draw_edge_labels: MockerFixture
 ):
-    """
-    Verify that multiple edge weights between the same nodes are combined with a comma for heterogeneous graphs.
-    """
+    """異種グラフでも並列エッジ重みがカンマ結合で表示されることを確認する。"""
     # Create parallel edges with different etypes:
     # user_0 -> user_1 via 'follow' (weight 0.5)
     # user_0 -> user_1 via 'follow' (weight 0.8) - another parallel edge in same type

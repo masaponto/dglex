@@ -15,6 +15,7 @@ DEFAULT_LIMITS = {"max_nodes": 500, "max_edges": 2000}
 
 
 def test_cli_module_import_is_lazy(monkeypatch):
+    """CLIモジュール読込時に可視化関連モジュールが遅延されることを確認する。"""
     monkeypatch.delitem(sys.modules, "dglex.cli", raising=False)
     monkeypatch.delitem(sys.modules, "dglex.view.plot", raising=False)
     monkeypatch.delitem(sys.modules, "dglex.view.style", raising=False)
@@ -36,6 +37,7 @@ def temp_dgl_file(tmp_path):
 
 
 def test_cli_view_basic(temp_dgl_file):
+    """view サブコマンド実行時に plot_graph が呼ばれることを確認する。"""
     with patch("matplotlib.pyplot.show"), \
          patch("dglex.view.plot.plot_graph") as mock_plot:
 
@@ -48,6 +50,7 @@ def test_cli_view_basic(temp_dgl_file):
 
 
 def test_cli_view_save_output(temp_dgl_file, tmp_path):
+    """--output 指定時に savefig で画像保存処理が呼ばれることを確認する。"""
     output_png = os.path.join(tmp_path, "output.png")
     with patch("matplotlib.pyplot.savefig") as mock_savefig, \
          patch("dglex.view.plot.plot_graph"):
@@ -59,6 +62,7 @@ def test_cli_view_save_output(temp_dgl_file, tmp_path):
 
 
 def test_cli_view_with_options(temp_dgl_file):
+    """CLIオプションが plot_graph の引数へ正しく伝播されることを確認する。"""
     with patch("matplotlib.pyplot.show"), \
          patch("dglex.view.plot.plot_graph") as mock_plot:
 
@@ -82,6 +86,7 @@ def test_cli_view_with_options(temp_dgl_file):
 
 
 def test_cli_view_invalid_palette(temp_dgl_file):
+    """不正パレット指定時にエラーメッセージが標準エラーへ出力されることを確認する。"""
     with patch("dglex.view.plot.plot_graph", side_effect=ValueError("is not a valid palette name")), \
          patch("sys.stderr", new_callable=MagicMock) as mock_stderr:
 
@@ -93,6 +98,7 @@ def test_cli_view_invalid_palette(temp_dgl_file):
 
 
 def test_cli_view_large_graph_sampling(tmp_path):
+    """大規模グラフでサンプリング描画経路が選択されることを確認する。"""
     # Create a "large" graph (over 500 nodes)
     src = torch.arange(600)
     dst = (src + 1) % 600
@@ -116,6 +122,7 @@ def test_cli_view_large_graph_sampling(tmp_path):
 
 
 def test_cli_view_with_config_file(temp_dgl_file):
+    """設定ファイルの値が view 実行時に反映されることを確認する。"""
     config_data = {
         "view": {
             "node_palette": "magma",
@@ -143,34 +150,42 @@ def test_cli_view_with_config_file(temp_dgl_file):
 
 
 def test_decide_action_small_graph():
+    """小規模グラフでは continue が返ることを確認する。"""
     assert _decide_sampling_action(100, 500, DEFAULT_LIMITS, False, True, False, "") == "continue"
 
 
 def test_decide_action_force_override():
+    """--force 指定時は大規模条件でも continue が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, True, False, False, "") == "continue"
 
 
 def test_decide_action_large_non_tty():
+    """非TTY環境の大規模グラフでは random が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, False, False, "") == "random"
 
 
 def test_decide_action_large_with_output():
+    """出力先指定時の大規模グラフでは random が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, True, True, "") == "random"
 
 
 def test_decide_action_user_continue():
+    """ユーザー選択 1 で continue が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, True, False, "1") == "continue"
 
 
 def test_decide_action_user_hub():
+    """ユーザー選択 3 で hub が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, True, False, "3") == "hub"
 
 
 def test_decide_action_user_abort():
+    """ユーザー選択 4 で abort が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, True, False, "4") == "abort"
 
 
 def test_decide_action_user_default_random():
+    """ユーザー選択 2 で random が返ることを確認する。"""
     assert _decide_sampling_action(600, 3000, DEFAULT_LIMITS, False, True, False, "2") == "random"
 
 
@@ -180,6 +195,7 @@ def test_decide_action_user_default_random():
     (500, 2001, "random"),    # 境界値: エッジ超過
 ], ids=["at_limit", "node_over", "edge_over"])
 def test_decide_action_size_boundary(num_nodes, num_edges, expected):
+    """ノード数・エッジ数の境界値で期待するアクションが返ることを確認する。"""
     action = _decide_sampling_action(
         num_nodes, num_edges, DEFAULT_LIMITS,
         force=False, is_tty=False, has_output=False, user_choice=""
@@ -188,6 +204,7 @@ def test_decide_action_size_boundary(num_nodes, num_edges, expected):
 
 
 def test_cli_help():
+    """--help 実行時に終了コード 0 で正常終了することを確認する。"""
     with patch("sys.stdout"), \
          patch("sys.argv", ["dglex", "--help"]):
         with pytest.raises(SystemExit) as e:
