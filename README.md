@@ -100,7 +100,7 @@ dglex view my_graph.bin --output graph_preview.png
 ```
 
 ### Jupyter Notebook
- See examples/visualization.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/visualization.ipynb)
+See examples/dglex_guide.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/dglex_guide.ipynb)
 
 
 ### Configuration File (`dglex.yaml`)
