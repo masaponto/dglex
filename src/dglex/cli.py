@@ -1,8 +1,5 @@
 import argparse
 
-from dglex.info import info
-from dglex.view import view
-
 
 def main() -> None:
     """dglex CLI のエントリポイント。サブコマンドを登録してディスパッチする。"""
@@ -54,8 +51,14 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "view":
+        # Lazy import: avoid importing heavy visualization deps on CLI startup.
+        from dglex.view.core import view
+
         view(args)
     elif args.command == "info":
+        # Lazy import: keep startup lightweight unless info command is executed.
+        from dglex.info.core import info
+
         info(args)
     else:
         parser.print_help()

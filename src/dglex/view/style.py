@@ -141,7 +141,8 @@ def _get_heterogeneous_edge_colors_and_legend_reverse_etypes(
         graph (dgl.DGLHeteroGraph): The source DGL heterogeneous graph.
         ng (nx.Graph): The converted NetworkX graph.
         etype_colors (List[Color]): Colors for each unique edge identity (ueid).
-        ueid_master (Dict[int, Any]): Mapping from etype ID to EdgeTypeInfo (containing ueid).
+        ueid_master (Dict[int, Any]): Mapping from etype ID to EdgeTypeInfo 相当オブジェクト。
+            値は ``.ueid`` と ``.etype_legend_name`` 属性を持つことを想定する。
         edge_weight (Optional[Dict]): Edge weight dictionary. Currently unused for coloring.
 
     Returns:
@@ -315,5 +316,4 @@ def _get_heterogeneous_edge_labels(
         combined[(u, v)].append(f"{weight:.3f}")
 
     return {k: ", ".join(v) for k, v in combined.items()}
-
 

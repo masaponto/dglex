@@ -1,4 +1,6 @@
+import importlib
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import dgl
@@ -10,6 +12,19 @@ from dglex.cli import main
 from dglex.view import _decide_sampling_action
 
 DEFAULT_LIMITS = {"max_nodes": 500, "max_edges": 2000}
+
+
+def test_cli_module_import_is_lazy(monkeypatch):
+    monkeypatch.delitem(sys.modules, "dglex.cli", raising=False)
+    monkeypatch.delitem(sys.modules, "dglex.view.plot", raising=False)
+    monkeypatch.delitem(sys.modules, "dglex.view.style", raising=False)
+    monkeypatch.delitem(sys.modules, "dglex.view.graph_ops", raising=False)
+
+    importlib.import_module("dglex.cli")
+
+    assert "dglex.view.plot" not in sys.modules
+    assert "dglex.view.style" not in sys.modules
+    assert "dglex.view.graph_ops" not in sys.modules
 
 
 @pytest.fixture

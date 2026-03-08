@@ -179,7 +179,11 @@ def _run_dataloader(dataloader: Any) -> tuple:
     """DataLoader から1バッチ取り出す（macOS/Linux 対応）。
 
     Args:
-        dataloader: DGL の DataLoader インスタンス。
+        dataloader: DGL の DataLoader 互換オブジェクト。
+            実際には ``next(iter(dataloader))`` で
+            ``(input_nodes, output_nodes, blocks)`` を返すことを想定する。
+            homogeneous では ``input_nodes/output_nodes`` は ``torch.Tensor``、
+            heterogeneous では ``Dict[str, torch.Tensor]`` になる。
 
     Returns:
         tuple: (input_nodes, output_nodes, blocks) のタプル。
@@ -196,7 +200,8 @@ def _validate_edge_weight(edge_weight: Optional[torch.Tensor], shape: Any):
 
     Args:
         edge_weight (Optional[torch.Tensor]): The edge weight tensor to validate.
-        shape (Any): The expected shape or current shape info for error reporting.
+        shape (Any): エラーメッセージ用の shape 情報。
+            呼び出し側では通常 ``tuple[int, ...]`` を渡す。
 
     Raises:
         ValueError: If `edge_weight` is not 1D.
@@ -213,7 +218,10 @@ def _get_edge_weight(graph: Union[dgl.DGLGraph, dgl.DGLHeteroGraph], edge_weight
         edge_weight_name (Optional[str]): The name of the edge data field.
 
     Returns:
-        Any: The edge weight data (Tensor or Dict of Tensors), or None.
+        Any: edge_weight_name が指定された場合に edge data を返す。
+            homogeneous では ``torch.Tensor``、
+            heterogeneous では ``Dict[(src, etype, dst), torch.Tensor]``。
+            指定がない場合は ``None``。
     """
     return graph.edata[edge_weight_name] if edge_weight_name else None
 
@@ -446,10 +454,14 @@ def _extract_subgraph(
         edge_weight_name (Optional[str]): Edge weight field.
 
     Returns:
-        Tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], Dict[Any, Any]]: Extracted subgraph and its labels.
+        Tuple[Union[dgl.DGLGraph, dgl.DGLHeteroGraph], Dict[Any, Any]]:
+            Extracted subgraph and labels.
+            homogeneous: ``(DGLGraph, Dict[int, str])``
+            heterogeneous: ``(DGLHeteroGraph, Dict[str, Dict[int, str]])``
     """
     if graph.is_homogeneous:
-        # Cast for type safety
+        # graph type で実行経路を確定させる。現行の type hint を維持するため
+        # target_nodes/node_labels/fanouts はここで homogeneous 形へ扱う。
         homo_target_nodes = target_nodes # type: ignore
         homo_node_labels = node_labels # type: ignore
         homo_fanouts = fanouts # type: ignore
@@ -458,7 +470,8 @@ def _extract_subgraph(
         else:
             return _extract_sub_graph_nhop_fanouts(graph, homo_target_nodes, homo_fanouts, homo_node_labels, edge_weight_name)
     else:
-        # Cast for type safety
+        # heterogeneous 経路では Dict[str, List[int]] / Dict[str, Dict[int, str]]
+        # 形を前提に下位関数へ委譲する。
         hetero_target_nodes = target_nodes # type: ignore
         hetero_node_labels = node_labels # type: ignore
         hetero_fanouts = fanouts # type: ignore
