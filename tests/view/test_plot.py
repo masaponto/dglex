@@ -4,7 +4,7 @@ import pytest
 import torch
 from pytest_mock import MockerFixture
 
-from dglex.visualisation import plot_graph, plot_subgraph_with_neighbors
+from dglex.view import plot_graph, plot_subgraph_with_neighbors
 
 
 @pytest.fixture
