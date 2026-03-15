@@ -4,6 +4,12 @@ import torch
 
 from dglex import GraphInfo, get_graph_info
 from dglex.info.types import DegreeStats, FeatureInfo, NodeDegreeStats
+from tests.pyg_stubs import (
+    FakePygData,
+    FakePygEdgeStore,
+    FakePygHeteroData,
+    FakePygNodeStore,
+)
 
 
 @pytest.fixture
@@ -37,7 +43,9 @@ def hetero_graph():
 def test_homo_graph_type(homo_graph):
     """graph_type が "homogeneous" であることを確認。"""
     info = get_graph_info(homo_graph)
+    assert info.backend == "dgl"
     assert info.graph_type == "homogeneous"
+    assert info.warnings == []
 
 
 def test_homo_graphs_count(homo_graph):
@@ -134,6 +142,7 @@ def test_homo_degree_stats(homo_graph):
 def test_hetero_graph_type(hetero_graph):
     """graph_type が "heterogeneous" であることを確認。"""
     info = get_graph_info(hetero_graph)
+    assert info.backend == "dgl"
     assert info.graph_type == "heterogeneous"
 
 
@@ -241,3 +250,117 @@ def test_empty_ntype_degree_stats_are_zero():
     assert ghost.out_degree.median == pytest.approx(0.0)
     assert ghost.out_degree.min == pytest.approx(0.0)
     assert ghost.out_degree.max == pytest.approx(0.0)
+
+
+@pytest.fixture
+def pyg_data_graph():
+    """ノード特徴量・エッジ特徴量付きの PyG homogeneous グラフスタブ。"""
+    return FakePygData(
+        edge_index=torch.tensor([[0, 1, 2], [1, 2, 0]], dtype=torch.int64),
+        num_nodes=3,
+        attributes={
+            "x": torch.zeros(3, 4, dtype=torch.float32),
+            "edge_attr": torch.ones(3, 1, dtype=torch.float64),
+        },
+    )
+
+
+@pytest.fixture
+def pyg_hetero_graph():
+    """ノード特徴量・エッジ特徴量付きの PyG heterogeneous グラフスタブ。"""
+    return FakePygHeteroData(
+        node_stores={
+            "user": FakePygNodeStore(
+                num_nodes=3,
+                attributes={"x": torch.ones(3, 2, dtype=torch.float32)},
+            ),
+            "item": FakePygNodeStore(
+                num_nodes=2,
+                attributes={"embedding": torch.ones(2, 3, dtype=torch.float32)},
+            ),
+        },
+        edge_stores={
+            ("user", "follows", "user"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.int64),
+            ),
+            ("user", "rates", "item"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 0], [0, 1]], dtype=torch.int64),
+                attributes={"edge_weight": torch.ones(2, 1, dtype=torch.float32)},
+            ),
+        },
+    )
+
+
+@pytest.fixture
+def pyg_hetero_graph_missing_num_nodes():
+    """一部 node type に explicit `num_nodes` がない PyG heterogeneous グラフスタブ。"""
+    return FakePygHeteroData(
+        node_stores={
+            "user": FakePygNodeStore(
+                num_nodes=3,
+                attributes={"x": torch.ones(3, 2, dtype=torch.float32)},
+            ),
+            "item": FakePygNodeStore(
+                attributes={"embedding": torch.ones(2, 3, dtype=torch.float32)},
+            ),
+        },
+        edge_stores={
+            ("user", "follows", "user"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.int64),
+            ),
+            ("user", "rates", "item"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 0], [0, 1]], dtype=torch.int64),
+                attributes={"edge_weight": torch.ones(2, 1, dtype=torch.float32)},
+            ),
+        },
+    )
+
+
+def test_pyg_data_graph_type(pyg_data_graph):
+    """PyG `Data` 互換オブジェクトが homogeneous として扱われることを確認。"""
+    info = get_graph_info(pyg_data_graph)
+    assert info.backend == "pyg"
+    assert info.graph_type == "homogeneous"
+
+
+def test_pyg_data_features_and_degrees(pyg_data_graph):
+    """PyG `Data` の特徴量と次数統計が取得できることを確認。"""
+    info = get_graph_info(pyg_data_graph)
+    assert info.num_nodes == {"_N": 3}
+    assert info.num_edges == {"_E": 3}
+    assert info.node_features["x"].dtype == "float32"
+    assert info.node_features["x"].shape == (3, 4)
+    assert info.edge_features["edge_attr"].dtype == "float64"
+    assert info.edge_features["edge_attr"].shape == (3, 1)
+    assert info.degree_stats["_N"].in_degree.mean == pytest.approx(1.0)
+    assert info.degree_stats["_N"].out_degree.mean == pytest.approx(1.0)
+
+
+def test_pyg_hetero_graph_type(pyg_hetero_graph):
+    """PyG `HeteroData` 互換オブジェクトが heterogeneous として扱われることを確認。"""
+    info = get_graph_info(pyg_hetero_graph)
+    assert info.backend == "pyg"
+    assert info.graph_type == "heterogeneous"
+
+
+def test_pyg_hetero_features_and_counts(pyg_hetero_graph):
+    """PyG `HeteroData` のノード数、エッジ数、特徴量が取得できることを確認。"""
+    info = get_graph_info(pyg_hetero_graph)
+    assert info.num_nodes == {"user": 3, "item": 2}
+    assert info.num_edges == {"user->user": 2, "user->item": 2}
+    assert info.node_features["user.x"].shape == (3, 2)
+    assert info.node_features["item.embedding"].shape == (2, 3)
+    assert info.edge_features["user->item.edge_weight"].shape == (2, 1)
+    assert info.degree_stats["user"].out_degree.max == pytest.approx(3.0)
+    assert info.degree_stats["item"].in_degree.mean == pytest.approx(1.0)
+
+
+def test_pyg_hetero_num_nodes_not_defined_summary_and_warnings(pyg_hetero_graph_missing_num_nodes):
+    """PyG heterogeneous で explicit `num_nodes` がない場合は not defined と warning を返す。"""
+    info = get_graph_info(pyg_hetero_graph_missing_num_nodes)
+    assert info.num_nodes == {"user": 3, "item": None}
+    assert "item.embedding" in info.node_features
+    assert info.node_features["item.embedding"].shape == (2, 3)
+    assert info.degree_stats["item"].in_degree.mean == pytest.approx(1.0)
+    assert "item : not defined" in info.summary
+    assert any("item.num_nodes is not explicitly defined" in warning for warning in info.warnings)

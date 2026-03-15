@@ -1,15 +1,23 @@
 import importlib
 import os
 import sys
+import warnings
 from unittest.mock import MagicMock, patch
 
 import dgl
 import pytest
 import torch
 import yaml
+from torch_geometric.data import HeteroData
 
 from dglex.cli import main
 from dglex.view import _decide_sampling_action
+from tests.pyg_stubs import (
+    FakePygData,
+    FakePygEdgeStore,
+    FakePygHeteroData,
+    FakePygNodeStore,
+)
 
 DEFAULT_LIMITS = {"max_nodes": 500, "max_edges": 2000}
 
@@ -243,6 +251,65 @@ def hetero_graph_file(tmp_path):
     return file_path
 
 
+@pytest.fixture
+def pyg_graph_file(tmp_path):
+    """PyG homogeneous グラフ互換オブジェクトを保存したファイルを作成する。"""
+    graph = FakePygData(
+        edge_index=torch.tensor([[0, 1, 2], [1, 2, 0]], dtype=torch.int64),
+        num_nodes=3,
+        attributes={
+            "x": torch.zeros(3, 4, dtype=torch.float32),
+            "edge_attr": torch.ones(3, 1, dtype=torch.float32),
+        },
+    )
+    file_path = os.path.join(tmp_path, "pyg_graph.pt")
+    torch.save(graph, file_path)
+    return file_path
+
+
+@pytest.fixture
+def pyg_hetero_graph_file(tmp_path):
+    """PyG heterogeneous グラフ互換オブジェクトを保存したファイルを作成する。"""
+    graph = FakePygHeteroData(
+        node_stores={
+            "user": FakePygNodeStore(
+                num_nodes=3,
+                attributes={"x": torch.ones(3, 2, dtype=torch.float32)},
+            ),
+            "item": FakePygNodeStore(
+                num_nodes=2,
+                attributes={"embedding": torch.ones(2, 3, dtype=torch.float32)},
+            ),
+        },
+        edge_stores={
+            ("user", "follows", "user"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.int64),
+            ),
+            ("user", "rates", "item"): FakePygEdgeStore(
+                edge_index=torch.tensor([[0, 0], [0, 1]], dtype=torch.int64),
+                attributes={"edge_weight": torch.ones(2, 1, dtype=torch.float32)},
+            ),
+        },
+    )
+    file_path = os.path.join(tmp_path, "pyg_hetero_graph.pt")
+    torch.save(graph, file_path)
+    return file_path
+
+
+@pytest.fixture
+def real_pyg_hetero_graph_missing_num_nodes_file(tmp_path):
+    """explicit `num_nodes` を省略した実 PyG heterogeneous グラフファイルを作成する。"""
+    graph = HeteroData()
+    graph["user"].x = torch.ones(3, 2, dtype=torch.float32)
+    graph["item"].embedding = torch.ones(2, 3, dtype=torch.float32)
+    graph["user", "follows", "user"].edge_index = torch.tensor([[0, 1], [1, 2]], dtype=torch.int64)
+    graph["user", "rates", "item"].edge_index = torch.tensor([[0, 0], [0, 1]], dtype=torch.int64)
+    graph["user", "rates", "item"].edge_weight = torch.ones(2, 1, dtype=torch.float32)
+    file_path = os.path.join(tmp_path, "real_pyg_hetero_missing_num_nodes.pt")
+    torch.save(graph, file_path)
+    return file_path
+
+
 def test_info_homo_graph_summary(homo_graph_file, capsys):
     """homogeneous グラフの主要セクションが出力されることを確認。"""
     with patch("sys.argv", ["dglex", "info", homo_graph_file]):
@@ -295,6 +362,50 @@ def test_info_edge_features_shown_when_present(hetero_graph_file, capsys):
     assert "weight" in captured.out
 
 
+def test_info_pyg_graph_summary(pyg_graph_file, capsys):
+    """PyG homogeneous グラフファイルでも summary が出力されることを確認。"""
+    with patch("sys.argv", ["dglex", "info", pyg_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Graph Summary" in captured.out
+    assert "Graph type     : homogeneous" in captured.out
+    assert "Node Features" in captured.out
+    assert "Edge Features" in captured.out
+    assert "x : float32 (3, 4)" in captured.out
+    assert "edge_attr : float32 (3, 1)" in captured.out
+
+
+def test_info_pyg_hetero_graph_summary(pyg_hetero_graph_file, capsys):
+    """PyG heterogeneous グラフファイルでも type ごとの集計が出力されることを確認。"""
+    with patch("sys.argv", ["dglex", "info", pyg_hetero_graph_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Graph type     : heterogeneous" in captured.out
+    assert "user : 3" in captured.out
+    assert "item : 2" in captured.out
+    assert "user -> item : 2" in captured.out
+    assert "user.x : float32 (3, 2)" in captured.out
+    assert "user->item.edge_weight : float32 (2, 1)" in captured.out
+
+
+def test_info_real_pyg_hetero_num_nodes_not_defined(real_pyg_hetero_graph_missing_num_nodes_file, capsys):
+    """実 PyG heterogeneous で explicit `num_nodes` がない node type を not defined と表示する。"""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with patch("sys.argv", ["dglex", "info", real_pyg_hetero_graph_missing_num_nodes_file]):
+            main()
+
+    captured = capsys.readouterr()
+    assert caught == []
+    assert "Graph type     : heterogeneous" in captured.out
+    assert "item : not defined" in captured.out
+    assert "item.embedding : float32 (2, 3)" in captured.out
+    assert "Warnings" in captured.out
+    assert "item.num_nodes is not explicitly defined" in captured.out
+
+
 def test_info_no_edge_features_section_when_absent(homo_graph_file, capsys):
     """エッジ特徴量がない場合に Edge Features セクションが出力されないことを確認。"""
     with patch("sys.argv", ["dglex", "info", homo_graph_file]):
@@ -315,7 +426,7 @@ def test_info_file_not_found(tmp_path, capsys):
 
 
 def test_info_invalid_file(tmp_path, capsys):
-    """無効なファイルを指定した場合に 'Error: file does not contain a valid DGL graph' が stderr に出力されることを確認。"""
+    """無効なファイルを指定した場合にサポート外エラーが stderr に出力されることを確認。"""
     invalid_file = os.path.join(tmp_path, "invalid.bin")
     with open(invalid_file, "w") as f:
         f.write("not a dgl file")
@@ -324,4 +435,4 @@ def test_info_invalid_file(tmp_path, capsys):
         main()
 
     captured = capsys.readouterr()
-    assert "Error: file does not contain a valid DGL graph" in captured.err
+    assert "Error: file does not contain a supported DGL or PyG graph" in captured.err

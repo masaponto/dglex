@@ -45,8 +45,12 @@ def main() -> None:
     )
 
     # info sub-command
-    info_parser = subparsers.add_parser("info", help="Show DGL graph file information")
-    info_parser.add_argument("path", type=str, help="Path to the DGL graph (.bin) file")
+    info_parser = subparsers.add_parser("info", help="Show graph file information")
+    info_parser.add_argument(
+        "path",
+        type=str,
+        help="Path to a serialized graph file (for example DGL .bin or PyG .pt)",
+    )
 
     args = parser.parse_args()
 

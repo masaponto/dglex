@@ -8,6 +8,7 @@ This library is an extension of [DGL](https://www.dgl.ai/). It provides some use
 ## Features
 - Graph visualization for DGL graphs
 - CLI preview tool for `.bin` graph files
+- `info` support for DGL and PyG serialized graph objects
 - Support for heterogeneous graphs
 - Automatic sampling for large graphs
 - Configurable via `dglex.yaml`
@@ -33,10 +34,16 @@ pip install git+https://github.com/masaponto/dglex.git
 ### CLI
 
 #### `info` — Inspect graph file structure
-Display node counts, edge counts, degree statistics (mean/median/min/max per node type), and feature information of a DGL graph file (`.bin`).
+Display node counts, edge counts, degree statistics (mean/median/min/max per node type), and feature information of a serialized graph file.
+
+Currently supported input forms:
+
+- DGL graph files created by `dgl.save_graphs(...)`
+- PyG graph objects saved by `torch.save(...)` for `Data`, `HeteroData`, or a list of them
 
 ```bash
 dglex info my_graph.bin
+dglex info my_graph.pt
 ```
 
 Example output (heterogeneous graph):
@@ -101,6 +108,13 @@ dglex view my_graph.bin --output graph_preview.png
 
 ### Jupyter Notebook
 See examples/dglex_guide.ipynb. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/masaponto/dglex/blob/main/examples/dglex_guide.ipynb)
+
+### Optional PyG Support
+If you want to use `dglex info` with PyTorch Geometric objects, install PyG in the same environment.
+
+```bash
+pip install "dglex[pyg]"
+```
 
 
 ### Configuration File (`dglex.yaml`)

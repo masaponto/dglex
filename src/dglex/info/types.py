@@ -34,7 +34,12 @@ class DegreeStats:
 
 @dataclass
 class NodeDegreeStats:
-    """ノード種別ごとの in/out 次数統計。"""
+    """ノード種別ごとの in/out 次数統計。
+
+    Attributes:
+        in_degree: 入次数の統計情報。
+        out_degree: 出次数の統計情報。
+    """
 
     in_degree: DegreeStats
     out_degree: DegreeStats
@@ -42,27 +47,31 @@ class NodeDegreeStats:
 
 @dataclass
 class GraphInfo:
-    """DGL グラフの構造情報をまとめた dataclass。
+    """グラフ backend 非依存の構造情報をまとめた dataclass。
 
     Attributes:
+        backend: グラフ backend 名。例: "dgl", "pyg"。
         graph_type: "homogeneous" または "heterogeneous"。
         graphs_count: ファイル内のグラフ総数。
-        num_nodes: ノードタイプごとのノード数辞書。homogeneous の場合は {"_N": n}。
+        num_nodes: ノードタイプごとのノード数辞書。未定義の場合は `None`。
         num_edges: エッジタイプごとのエッジ数辞書。homogeneous の場合は {"_E": n}。
         node_features: ノード特徴量の辞書。キーは "ntype.feat_name"（homogeneous の場合は "feat_name"）。
         edge_features: エッジ特徴量の辞書。キーは "src->dst.feat_name"（homogeneous の場合は "feat_name"）。
         degree_stats: ノード種別ごとの in/out 次数統計。
+        warnings: 表示時に伝える補足情報。
         summary: CLI と同じテキスト形式の要約文字列。
     """
 
+    backend: str
     graph_type: str
     graphs_count: int
-    num_nodes: Dict[str, int]
+    num_nodes: Dict[str, int | None]
     num_edges: Dict[str, int]
     node_features: Dict[str, FeatureInfo]
     edge_features: Dict[str, FeatureInfo]
     summary: str
     degree_stats: Dict[str, NodeDegreeStats] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         """summary テキストを返す。

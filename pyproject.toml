@@ -15,6 +15,11 @@ dependencies = [
     "pyyaml>=6.0.3",
 ]
 
+[project.optional-dependencies]
+pyg = [
+    "torch-geometric>=2.5.0",
+]
+
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'"},
@@ -41,6 +46,7 @@ dev = [
     "dgl",
     "torch==2.3.0; sys_platform == 'linux'",
     "torch==2.0.1; sys_platform == 'darwin'",
+    "torch-geometric>=2.5.0",
     "ipykernel>=6.29.5",
     "pytest>=8.3.4",
     "pytest-mock>=3.14.0",
@@ -57,4 +63,3 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
-
